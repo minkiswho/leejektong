@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>เก็บ userId</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, "Helvetica Neue", "Sukhumvit Set", sans-serif;
+      background: #f7f7f5; color: #1a1a1a;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 24px; gap: 20px;
+    }
+    h1 { font-size: 19px; font-weight: 700; }
+    .sub { font-size: 14px; color: #666; text-align: center; line-height: 1.5; }
+    .card {
+      width: 100%; max-width: 420px; background: #fff; border-radius: 14px;
+      padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .label { font-size: 12px; color: #999; margin-bottom: 6px; }
+    #uid {
+      font-size: 13px; word-break: break-all; line-height: 1.6;
+      background: #f0f0ee; padding: 14px; border-radius: 10px; min-height: 52px;
+      display: flex; align-items: center; font-family: ui-monospace, monospace;
+    }
+    #name { font-size: 15px; font-weight: 600; margin-top: 10px; }
+    button {
+      width: 100%; max-width: 420px; padding: 16px; font-size: 16px; font-weight: 600;
+      border: none; border-radius: 12px; background: #06c755; color: #fff;
+      cursor: pointer; transition: opacity .15s;
+    }
+    button:disabled { opacity: .4; }
+    button:active { opacity: .7; }
+    .err { color: #d92d20; }
+  </style>
+</head>
+<body>
+  <h1>เก็บ LINE userId</h1>
+  <p class="sub">เปิดหน้านี้ในแอป LINE<br>แล้วส่งค่าด้านล่างให้ Mink กรอกลง EMPLOYEES</p>
+  <div class="card">
+    <div class="label">userId</div>
+    <div id="uid">กำลังโหลด…</div>
+    <div id="name"></div>
+  </div>
+  <button id="copyBtn" disabled>คัดลอก userId</button>
+
+  <script>
+    // ====== ใส่ LIFF ID ตรงนี้ ======
+    var LIFF_ID = "2010362712-uGq1XJQ6";
+    // ================================
+    var uidBox = document.getElementById("uid");
+    var nameBox = document.getElementById("name");
+    var copyBtn = document.getElementById("copyBtn");
+    var currentUid = null;
+
+    liff.init({ liffId: LIFF_ID })
+      .then(function () {
+        if (!liff.isLoggedIn()) { liff.login(); return; }
+        return liff.getProfile();
+      })
+      .then(function (p) {
+        if (!p) return;
+        currentUid = p.userId;
+        uidBox.innerText = p.userId;
+        nameBox.innerText = "ชื่อ: " + p.displayName;
+        copyBtn.disabled = false;
+      })
+      .catch(function (e) {
+        uidBox.className = "err";
+        uidBox.innerText = "ERROR: " + (e && e.message ? e.message : e);
+      });
+
+    copyBtn.onclick = function () {
+      if (!currentUid) return;
+      navigator.clipboard.writeText(currentUid).then(function () {
+        copyBtn.innerText = "คัดลอกแล้ว ✓";
+        setTimeout(function () { copyBtn.innerText = "คัดลอก userId"; }, 1500);
+      });
+    };
+  </script>
+</body>
+</html>
