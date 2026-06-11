@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>เช็คอิน / เช็คเอาท์ — หลีเจ็กตง</title>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    :root {
+      --brand:      #C0392B;
+      --brand-dark: #922B21;
+      --surface:    #FDF6EC;
+      --card:       #FFFFFF;
+      --text:       #2C1A0E;
+      --sub:        #7B6252;
+      --border:     #E8D5C4;
+      --success:    #1E8449;
+      --success-bg: #EAFAF1;
+      --success-bd: #A9DFBF;
+      --warn:       #B7770D;
+      --warn-bg:    #FEF9E7;
+      --warn-bd:    #F9E79F;
+      --error-bg:   #FDECEA;
+      --error-bd:   #F5B7B1;
+      --error-text: #922B21;
+      --radius:     16px;
+      --shadow:     0 2px 12px rgba(44,26,14,.10);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, "Noto Sans Thai", "Sarabun", sans-serif;
+      background: var(--surface);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* HEADER */
+    .header {
+      background: var(--brand);
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .back-btn {
+      background: rgba(255,255,255,.15); border: none;
+      border-radius: 8px; width: 34px; height: 34px;
+      color: #fff; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .header-title { color: #fff; }
+    .header-title h1 { font-size: 17px; font-weight: 700; }
+    .header-title p  { font-size: 11px; opacity: .75; margin-top: 1px; }
+
+    /* INFO CARD */
+    .info-card {
+      margin: 16px 16px 0;
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .info-icon { font-size: 28px; flex-shrink: 0; }
+    .info-name { font-size: 16px; font-weight: 700; }
+    .info-branch { font-size: 13px; color: var(--sub); margin-top: 2px; }
+
+    /* STATUS CARD */
+    .status-card {
+      margin: 12px 16px 0;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex; align-items: center; gap: 12px;
+      border-width: 1px; border-style: solid;
+    }
+    .status-card.none  { background: var(--warn-bg);    border-color: var(--warn-bd); }
+    .status-card.in    { background: var(--success-bg); border-color: var(--success-bd); }
+    .status-card.done  { background: #F2F3F4;           border-color: #D5DBDB; }
+    .status-icon { font-size: 24px; flex-shrink: 0; }
+    .status-label { font-size: 14px; font-weight: 700; }
+    .status-sub   { font-size: 12px; margin-top: 2px; }
+    .status-card.none  .status-label { color: var(--warn); }
+    .status-card.none  .status-sub   { color: #8D6E28; }
+    .status-card.in    .status-label { color: var(--success); }
+    .status-card.in    .status-sub   { color: #239B56; }
+    .status-card.done  .status-label { color: #5D6D7E; }
+    .status-card.done  .status-sub   { color: #7F8C8D; }
+
+    /* GPS CARD */
+    .gps-card {
+      margin: 12px 16px 0;
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .gps-row { display: flex; align-items: center; gap: 8px; }
+    .gps-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .gps-dot.searching { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+    .gps-dot.ok        { background: var(--success); }
+    .gps-dot.fail      { background: var(--brand); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .gps-label { font-size: 14px; font-weight: 600; }
+    .gps-sub   { font-size: 12px; color: var(--sub); margin-top: 4px; margin-left: 18px; }
+
+    /* NOTE INPUT */
+    .note-wrap { margin: 12px 16px 0; }
+    .note-label { font-size: 12px; font-weight: 600; color: var(--sub); margin-bottom: 6px; display: block; }
+    .note-input {
+      width: 100%; background: var(--card);
+      border: 1.5px solid var(--border); border-radius: 12px;
+      padding: 12px 14px; font-size: 14px;
+      font-family: inherit; color: var(--text);
+      resize: none; outline: none;
+      transition: border-color .15s;
+    }
+    .note-input:focus { border-color: var(--brand); }
+
+    /* MAIN ACTION BUTTON */
+    .action-wrap { padding: 20px 16px 0; }
+    .action-btn {
+      width: 100%; padding: 18px;
+      font-size: 17px; font-weight: 800;
+      border: none; border-radius: var(--radius);
+      cursor: pointer; display: flex;
+      align-items: center; justify-content: center; gap: 10px;
+      transition: opacity .15s, transform .1s;
+      letter-spacing: .03em;
+    }
+    .action-btn:active:not(:disabled) { transform: scale(.97); }
+    .action-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .action-btn.checkin-mode  { background: var(--brand); color: #fff; }
+    .action-btn.checkout-mode { background: var(--brand-dark); color: #fff; }
+    .action-btn.done-mode     { background: #D5DBDB; color: #5D6D7E; }
+    .spinner {
+      width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin .7s linear infinite; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* RESULT CARD */
+    .result-card {
+      margin: 12px 16px 0;
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      border-width: 1px; border-style: solid;
+      display: none;
+    }
+    .result-card.success { background: var(--success-bg); border-color: var(--success-bd); }
+    .result-card.fail    { background: var(--error-bg);   border-color: var(--error-bd); }
+    .result-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .result-card.success .result-title { color: var(--success); }
+    .result-card.fail    .result-title { color: var(--error-text); }
+    .result-detail { font-size: 13px; margin-top: 6px; color: var(--sub); line-height: 1.6; }
+
+    /* SKELETON */
+    .skeleton {
+      background: linear-gradient(90deg,#EDE0D4 25%,#F7EFE6 50%,#EDE0D4 75%);
+      background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  </style>
+</head>
+<body>
+
+<script>
+  var LIFF_ID       = '2010362712-uGq1XJQ6';
+  var WEB_APP_URL   = 'https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec';
+  var SHARED_SECRET = 'LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga';
+</script>
+
+<!-- HEADER -->
+<div class="header">
+  <button class="back-btn" onclick="history.back()">←</button>
+  <div class="header-title">
+    <h1>เช็คอิน / เช็คเอาท์</h1>
+    <p id="todayDate">โหลด...</p>
+  </div>
+</div>
+
+<!-- INFO CARD -->
+<div class="info-card">
+  <div class="info-icon">👤</div>
+  <div>
+    <div class="info-name" id="infoName" style="height:16px;width:100px" class="skeleton"></div>
+    <div class="info-branch" id="infoBranch" style="height:12px;width:70px;margin-top:4px" class="skeleton"></div>
+  </div>
+</div>
+
+<!-- STATUS CARD (dynamic) -->
+<div class="status-card none" id="statusCard">
+  <div class="status-icon" id="statusIcon">⏳</div>
+  <div>
+    <div class="status-label" id="statusLabel">กำลังตรวจสอบ...</div>
+    <div class="status-sub"   id="statusSub"></div>
+  </div>
+</div>
+
+<!-- GPS CARD -->
+<div class="gps-card" id="gpsCard">
+  <div class="gps-row">
+    <div class="gps-dot searching" id="gpsDot"></div>
+    <div class="gps-label" id="gpsLabel">กำลังระบุพิกัด...</div>
+  </div>
+  <div class="gps-sub" id="gpsSub">กรุณาอนุญาตการเข้าถึง GPS</div>
+</div>
+
+<!-- NOTE -->
+<div class="note-wrap" id="noteWrap" style="display:none">
+  <label class="note-label" for="noteInput">หมายเหตุ (ไม่บังคับ)</label>
+  <textarea class="note-input" id="noteInput" rows="2" placeholder="เช่น มาสาย เพราะรถติด..."></textarea>
+</div>
+
+<!-- ACTION BUTTON -->
+<div class="action-wrap" id="actionWrap" style="display:none">
+  <button class="action-btn checkin-mode" id="actionBtn" disabled>
+    <div class="spinner" id="spinner"></div>
+    <span id="btnText">กำลังโหลด...</span>
+  </button>
+</div>
+
+<!-- RESULT -->
+<div class="result-card" id="resultCard">
+  <div class="result-title" id="resultTitle"></div>
+  <div class="result-detail" id="resultDetail"></div>
+</div>
+
+<script>
+(function() {
+  var uid = null;
+  var gpsCoords = null;  // { lat, lng }
+  var currentState = null; // 'none' | 'in' | 'done'
+  var gpsReady = false;
+
+  // ── HELPERS ─────────────────────────────────────
+  function todayThai() {
+    return new Date().toLocaleDateString('th-TH', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      timeZone: 'Asia/Bangkok'
+    });
+  }
+
+  function nowTime() {
+    return new Date().toLocaleTimeString('th-TH', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok'
+    });
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  function callGAS(body) {
+    return fetch(WEB_APP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ token: SHARED_SECRET, userId: uid }, body))
+    }).then(function(r){ return r.json(); });
+  }
+
+  // ── GPS ─────────────────────────────────────────
+  function startGPS() {
+    if (!navigator.geolocation) {
+      setGPS('fail', 'เบราว์เซอร์ไม่รองรับ GPS', '');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        var acc = Math.round(pos.coords.accuracy);
+        gpsReady = true;
+        setGPS('ok', 'ระบุพิกัดแล้ว', 'ความแม่นยำ ±' + acc + ' ม.');
+        updateBtnState();
+      },
+      function(err) {
+        var msg = err.code === 1
+          ? 'กรุณาอนุญาต GPS แล้วลองใหม่'
+          : 'ไม่สามารถระบุพิกัดได้';
+        setGPS('fail', 'GPS ไม่พร้อม', msg);
+        updateBtnState();
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  }
+
+  function setGPS(state, label, sub) {
+    var dot = el('gpsDot');
+    dot.className = 'gps-dot ' + state;
+    el('gpsLabel').textContent = label;
+    el('gpsSub').textContent = sub;
+  }
+
+  // ── STATUS CARD ──────────────────────────────────
+  function setStatus(state, icon, label, sub) {
+    currentState = state;
+    var card = el('statusCard');
+    card.className = 'status-card ' + state;
+    el('statusIcon').textContent = icon;
+    el('statusLabel').textContent = label;
+    el('statusSub').textContent = sub;
+  }
+
+  // ── BUTTON STATE ─────────────────────────────────
+  function updateBtnState() {
+    if (currentState === null) return;
+
+    var btn = el('actionBtn');
+    var wrap = el('actionWrap');
+    var noteWrap = el('noteWrap');
+    wrap.style.display = 'block';
+
+    if (currentState === 'done') {
+      btn.className = 'action-btn done-mode';
+      btn.disabled = true;
+      el('btnText').textContent = '✅ บันทึกครบแล้ววันนี้';
+      noteWrap.style.display = 'none';
+      return;
+    }
+
+    noteWrap.style.display = 'block';
+    var isCheckin = (currentState === 'none');
+    btn.className = 'action-btn ' + (isCheckin ? 'checkin-mode' : 'checkout-mode');
+    el('btnText').textContent = isCheckin ? '📍  เช็คอิน' : '👋  เช็คเอาท์';
+    btn.disabled = !gpsReady;
+  }
+
+  // ── ACTION BUTTON CLICK ──────────────────────────
+  el('actionBtn').addEventListener('click', function() {
+    if (!gpsReady || !gpsCoords) {
+      showResult('fail', '⚠️ GPS ไม่พร้อม', 'กรุณาอนุญาต GPS แล้วลองใหม่');
+      return;
+    }
+
+    var action = (currentState === 'none') ? 'checkin' : 'checkout';
+    var note   = el('noteInput').value.trim();
+
+    setLoading(true);
+
+    callGAS({
+      action: action,
+      lat: gpsCoords.lat,
+      lng: gpsCoords.lng,
+      note: note
+    })
+    .then(function(data) {
+      setLoading(false);
+      if (data.ok) {
+        var typeLabel = data.type === 'checkin' ? 'เช็คอิน' : 'เช็คเอาท์';
+        showResult('success',
+          '✅ ' + typeLabel + 'สำเร็จ',
+          'เวลา ' + data.time + ' น.  |  ' + data.branch_name + '\nระยะจากร้าน ' + data.distance_m + ' ม.'
+        );
+        // อัปเดต state
+        if (data.type === 'checkin') {
+          setStatus('in', '🟢', 'เช็คอินแล้ว', 'เข้างาน ' + data.time + ' น.');
+        } else {
+          setStatus('done', '✔️', 'เสร็จสิ้นวันนี้', 'เข้า / ออก บันทึกครบแล้ว');
+        }
+        updateBtnState();
+        el('noteInput').value = '';
+      } else {
+        handleError(data.error);
+      }
+    })
+    .catch(function(e) {
+      setLoading(false);
+      showResult('fail', '❌ เชื่อมต่อไม่ได้', 'กรุณาลองใหม่อีกครั้ง');
+    });
+  });
+
+  function handleError(code) {
+    var msgs = {
+      UNAUTHORIZED:        ['❌ ไม่ได้รับอนุญาต', 'กรุณาออกแล้วเข้า LINE ใหม่'],
+      USER_NOT_FOUND:      ['❌ ไม่พบข้อมูลพนักงาน', 'ติดต่อมิ้งค์เพื่อตรวจสอบ'],
+      GPS_REQUIRED:        ['📍 ต้องการ GPS', 'กรุณาเปิด GPS แล้วลองใหม่'],
+      OUT_OF_RANGE:        ['🗺️ อยู่นอกรัศมีร้าน', 'ต้องอยู่ในรัศมี 200 ม. จากสาขา'],
+      ALREADY_CHECKED_IN:  ['⚠️ เช็คอินไปแล้ว', 'วันนี้บันทึกเวลาเข้าแล้ว'],
+      ALREADY_CHECKED_OUT: ['⚠️ เช็คเอาท์ไปแล้ว', 'วันนี้บันทึกเวลาออกแล้ว'],
+      NO_CHECKIN_YET:      ['⚠️ ยังไม่ได้เช็คอิน', 'ต้องเช็คอินก่อนจึงเช็คเอาท์ได้'],
+      BRANCH_NOT_FOUND:    ['❌ ไม่พบข้อมูลสาขา', 'ติดต่อมิ้งค์'],
+      BUSY_TRY_AGAIN:      ['⏳ ระบบยุ่งชั่วคราว', 'กรุณาลองใหม่อีกครั้ง'],
+    };
+    var m = msgs[code] || ['❌ เกิดข้อผิดพลาด', 'รหัส: ' + code];
+    showResult('fail', m[0], m[1]);
+  }
+
+  function showResult(type, title, detail) {
+    var card = el('resultCard');
+    card.className = 'result-card ' + type;
+    card.style.display = 'block';
+    el('resultTitle').textContent = title;
+    el('resultDetail').textContent = detail;
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function setLoading(on) {
+    var btn = el('actionBtn');
+    btn.disabled = on;
+    el('spinner').style.display = on ? 'block' : 'none';
+    el('btnText').style.visibility = on ? 'hidden' : 'visible';
+  }
+
+  // ── INIT ─────────────────────────────────────────
+  el('todayDate').textContent = todayThai();
+
+  liff.init({ liffId: LIFF_ID })
+    .then(function() {
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      return liff.getProfile();
+    })
+    .then(function(profile) {
+      if (!profile) return;
+      uid = profile.userId;
+
+      // ลองเอาจาก sessionStorage (มาจาก index.html) ก่อน
+      var name   = sessionStorage.getItem('lj_name');
+      var branch = sessionStorage.getItem('lj_branch_name');
+
+      if (name && branch) {
+        el('infoName').textContent   = name;
+        el('infoBranch').textContent = branch;
+        el('infoName').style         = '';
+        el('infoBranch').style       = '';
+        startFlow();
+      } else {
+        // โหลดจาก GAS ถ้ามาตรงโดยไม่ผ่าน index
+        return callGAS({ action: 'getProfile' }).then(function(data) {
+          if (data.ok) {
+            var emp = data.employee;
+            el('infoName').textContent   = emp.name;
+            el('infoBranch').textContent = emp.branch_name;
+            el('infoName').style         = '';
+            el('infoBranch').style       = '';
+            sessionStorage.setItem('lj_uid', uid);
+            sessionStorage.setItem('lj_name', emp.name);
+            sessionStorage.setItem('lj_branch_id', emp.branch_id);
+            sessionStorage.setItem('lj_branch_name', emp.branch_name);
+          } else {
+            el('infoName').textContent   = '-';
+            el('infoBranch').textContent = '-';
+          }
+          startFlow();
+        });
+      }
+    })
+    .catch(function(e) {
+      console.error(e);
+      setStatus('none', '❌', 'เชื่อมต่อไม่ได้', 'ปิดแล้วเปิดใหม่ใน LINE');
+    });
+
+  function startFlow() {
+    // ดึงสถานะวันนี้ก่อน แล้วค่อยขอ GPS
+    callGAS({ action: 'getTodayStatus' })
+      .then(function(data) {
+        if (data.ok) {
+          if (data.status === 'done') {
+            setStatus('done', '✔️', 'เสร็จสิ้นวันนี้',
+              'เข้า ' + data.checkin_time + ' / ออก ' + data.checkout_time);
+          } else if (data.status === 'in') {
+            setStatus('in', '🟢', 'เช็คอินแล้ว', 'เข้างาน ' + data.checkin_time + ' น.');
+          } else {
+            setStatus('none', '⏰', 'ยังไม่ได้เช็คอิน', 'กด เช็คอิน เมื่อถึงร้านแล้ว');
+          }
+        } else {
+          // ถ้า endpoint ยังไม่มี fallback เป็น none
+          setStatus('none', '⏰', 'ยังไม่ได้เช็คอิน', 'กดเช็คอินเมื่อถึงร้านแล้ว');
+        }
+        updateBtnState();
+        startGPS();
+      })
+      .catch(function() {
+        setStatus('none', '⏰', 'ยังไม่ได้เช็คอิน', 'กดเช็คอินเมื่อถึงร้านแล้ว');
+        updateBtnState();
+        startGPS();
+      });
+  }
+})();
+</script>
+</body>
+</html>
