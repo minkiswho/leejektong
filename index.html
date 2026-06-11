@@ -180,6 +180,78 @@
       border: none; border-radius: 8px; padding: 8px 18px;
       font-size: 13px; font-weight: 700; cursor: pointer;
     }
+
+    /* ── ONBOARD LINK (ท้ายหน้า) ──────────────────── */
+    .onboard-link {
+      display: block; text-align: center;
+      margin: 4px 16px 0;
+      font-size: 13px; color: var(--sub);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer; -webkit-user-select: none; user-select: none;
+      padding: 6px;
+    }
+    .onboard-link:active { opacity: .6; }
+
+    /* ── ONBOARD MODAL ────────────────────────────── */
+    .onboard-overlay {
+      position: fixed; inset: 0;
+      background: rgba(44,26,14,.55);
+      display: none; align-items: center; justify-content: center;
+      z-index: 200; padding: 24px;
+    }
+    .onboard-box {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 24px 22px;
+      max-width: 340px; width: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    }
+    .onboard-box h2 {
+      font-size: 18px; font-weight: 800;
+      text-align: center; margin-bottom: 6px;
+    }
+    .onboard-box .ob-sub {
+      font-size: 13px; color: var(--sub);
+      text-align: center; line-height: 1.5; margin-bottom: 18px;
+    }
+    .ob-field { margin-bottom: 14px; }
+    .ob-field-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .05em;
+      color: var(--sub); text-transform: uppercase; margin-bottom: 5px;
+    }
+    .ob-field-value {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px; word-break: break-all;
+      line-height: 1.5;
+    }
+    .ob-field-value.uid { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+    .ob-copy-btn {
+      width: 100%; padding: 14px;
+      background: var(--success); color: #fff;
+      border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background .15s, transform .1s;
+      margin-top: 4px;
+    }
+    .ob-copy-btn:active { transform: scale(.97); }
+    .ob-copy-btn.copied { background: var(--brand-dark); }
+    .ob-instruction {
+      background: #FEF5E7; border: 1px solid #F9E79F;
+      border-radius: 10px; padding: 12px 14px;
+      font-size: 13px; color: #8D6E28; line-height: 1.5;
+      margin-top: 14px; text-align: center;
+    }
+    .ob-close-btn {
+      width: 100%; padding: 12px;
+      background: transparent; color: var(--sub);
+      border: none; font-size: 14px; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -261,11 +333,41 @@
   </div>
 </div>
 
+<!-- ONBOARD LINK -->
+<div class="onboard-link" id="onboardLink" onclick="openOnboard()" style="display:none">ครั้งแรก? ลงทะเบียนที่นี่</div>
+
 <div class="footer">หลีเจ็กตง Internal System</div>
+
+<!-- ONBOARD MODAL -->
+<div class="onboard-overlay" id="onboardOverlay">
+  <div class="onboard-box">
+    <h2>ลงทะเบียนพนักงานใหม่</h2>
+    <p class="ob-sub">คัดลอก ID ด้านล่าง แล้วส่งให้ผู้จัดการทางแชท เพื่อเพิ่มเข้าระบบ</p>
+
+    <div class="ob-field">
+      <div class="ob-field-label">ชื่อ LINE ของคุณ</div>
+      <div class="ob-field-value" id="obName">-</div>
+    </div>
+
+    <div class="ob-field">
+      <div class="ob-field-label">User ID</div>
+      <div class="ob-field-value uid" id="obUid">-</div>
+    </div>
+
+    <button class="ob-copy-btn" id="obCopyBtn" onclick="copyUid()">
+      <span id="obCopyText">📋 คัดลอก ID</span>
+    </button>
+
+    <div class="ob-instruction">📨 ส่ง ID นี้ให้ผู้จัดการทางแชท แล้วรอเพิ่มเข้าระบบ</div>
+
+    <button class="ob-close-btn" onclick="closeOnboard()">ปิด</button>
+  </div>
+</div>
 
 <script>
 (function() {
   var uid = null;
+  var liffProfile = null;  // เก็บ profile ไว้ให้ onboard modal ใช้ (ไม่ call ซ้ำ)
 
   function showError(msg) {
     document.getElementById('errorCard').style.display = 'block';
@@ -318,12 +420,17 @@
     .then(function(profile) {
       if (!profile) return; // กำลัง redirect login
       uid = profile.userId;
+      liffProfile = profile;  // เก็บไว้ให้ onboard modal
       // ดึง employee profile จาก GAS
       return callGAS('getProfile');
     })
     .then(function(data) {
       if (!data) return;
       if (!data.ok) {
+        // ไม่อยู่ในระบบ → โชว์ลิงก์ลงทะเบียน
+        if (data.error === 'USER_NOT_FOUND') {
+          document.getElementById('onboardLink').style.display = 'block';
+        }
         showError(data.error === 'USER_NOT_FOUND'
           ? 'ไม่พบข้อมูลพนักงาน กรุณาติดต่อมิ้งค์'
           : 'เกิดข้อผิดพลาด: ' + (data.error || 'UNKNOWN'));
@@ -334,6 +441,7 @@
         document.getElementById('profileBranch').textContent = '-';
         return;
       }
+      // อยู่ในระบบแล้ว → ลิงก์ลงทะเบียนซ่อนไว้ (default ซ่อนอยู่แล้ว)
       var emp = data.employee;
       setProfile(emp.name, emp.branch_name, data.pictureUrl || null);
       // เก็บ uid+branchId ใน sessionStorage ให้หน้าอื่นใช้ต่อ
@@ -345,9 +453,63 @@
     })
     .catch(function(e) {
       console.error(e);
+      // เชื่อมต่อไม่ได้ → ยังโชว์ลิงก์ เผื่อคนใหม่หา userId ตัวเองได้
+      if (liffProfile && liffProfile.userId) {
+        document.getElementById('onboardLink').style.display = 'block';
+      }
       showError('เชื่อมต่อระบบไม่ได้ กรุณาปิดแล้วเปิดใหม่');
     });
+  // ── ONBOARD MODAL ─────────────────────────────
+  window.openOnboard = function() {
+    // ใช้ profile ที่ init มาแล้ว ไม่ call ซ้ำ ไม่ login ซ้ำ
+    if (liffProfile && liffProfile.userId) {
+      document.getElementById('obName').textContent = liffProfile.displayName || '(ไม่มีชื่อ)';
+      document.getElementById('obUid').textContent  = liffProfile.userId;
+    } else {
+      // เปิดนอก LINE (preview) หรือยังไม่ได้ profile
+      document.getElementById('obName').textContent = '(เปิดผ่าน LINE เพื่อดู ID)';
+      document.getElementById('obUid').textContent  = '-';
+    }
+    // reset ปุ่ม copy
+    var btn = document.getElementById('obCopyBtn');
+    btn.classList.remove('copied');
+    document.getElementById('obCopyText').textContent = '📋 คัดลอก ID';
+    document.getElementById('onboardOverlay').style.display = 'flex';
+  };
+
+  window.closeOnboard = function() {
+    document.getElementById('onboardOverlay').style.display = 'none';
+  };
+
+  window.copyUid = function() {
+    if (!liffProfile || !liffProfile.userId) return;
+    var text = liffProfile.userId;
+
+    function markCopied() {
+      var btn = document.getElementById('obCopyBtn');
+      btn.classList.add('copied');
+      document.getElementById('obCopyText').textContent = 'คัดลอกแล้ว ✓';
+    }
+
+    // modern clipboard API + fallback
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(markCopied).catch(function() {
+        fallbackCopy(text); markCopied();
+      });
+    } else {
+      fallbackCopy(text); markCopied();
+    }
+  };
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
 })();
-</script>
-</body>
-</html>
