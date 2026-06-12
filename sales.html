@@ -146,8 +146,14 @@ function amountValue(){
 $("dateLabel").innerText = "วันที่ " + thaiDate();
 
 liff.init({ liffId: LIFF_ID }).then(function(){
+  // ถ้าเปิดนอก LINE (เช่น Safari) → ยังไม่ login → เด้ง login ก่อน
+  if(!liff.isLoggedIn()){
+    liff.login();
+    return new Promise(function(){}); // ค้างไว้ระหว่าง redirect ไป login
+  }
   return liff.getProfile();
 }).then(function(p){
+  if(!p) return; // กันกรณี redirect
   uid = p.userId;
   return post({ token: SHARED_SECRET, userId: uid, action: "getProfile" });
 }).then(function(res){
