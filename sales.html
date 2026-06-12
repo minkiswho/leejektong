@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ส่งยอดขายรายวัน — หลีเจ็กตง</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{
+    --green:#06c755; --green-dark:#05a948;
+    --ink:#1c1c1e; --muted:#8a8a8e; --line:#e3e3e6;
+    --bg:#f5f5f7; --card:#ffffff; --red:#d92d20; --amber:#b54708;
+  }
+  *{box-sizing:border-box}
+  body{
+    font-family:-apple-system,"Helvetica Neue","Sarabun",sans-serif;
+    margin:0; background:var(--bg); color:var(--ink);
+    padding:20px 16px 40px; -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:460px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px;font-weight:700}
+  .sub{font-size:13px;color:var(--muted);margin:0 0 20px}
+  .card{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:18px;margin-bottom:14px;
+  }
+  label{display:block;font-size:14px;font-weight:600;margin-bottom:8px}
+  select,input,textarea{
+    width:100%;font-size:16px;font-family:inherit;
+    border:1px solid var(--line);border-radius:10px;
+    padding:13px 12px;background:#fff;color:var(--ink);
+    -webkit-appearance:none;appearance:none;
+  }
+  select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a8a8e' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;
+  }
+  .amount-row{position:relative}
+  .amount-row input{font-size:24px;font-weight:700;text-align:right;padding-right:48px;letter-spacing:.3px}
+  .baht{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;font-weight:600;pointer-events:none}
+  textarea{resize:none;min-height:64px}
+  .hint{font-size:12px;color:var(--muted);margin-top:7px}
+  button.submit{
+    width:100%;font-size:17px;font-weight:700;color:#fff;
+    background:var(--green);border:none;border-radius:12px;
+    padding:16px;margin-top:4px;cursor:pointer;transition:background .15s;
+  }
+  button.submit:active{background:var(--green-dark)}
+  button.submit:disabled{background:#c7c7cc;cursor:default}
+  .msg{
+    display:none;font-size:14px;line-height:1.5;
+    border-radius:10px;padding:12px 14px;margin-bottom:14px;
+  }
+  .msg.show{display:block}
+  .msg.ok{background:#e7f7ec;color:var(--green-dark);border:1px solid #b6e6c4}
+  .msg.warn{background:#fff4e5;color:var(--amber);border:1px solid #f5d6a8}
+  .msg.err{background:#fdecea;color:var(--red);border:1px solid #f5c2bd}
+  .loading{text-align:center;color:var(--muted);font-size:14px;padding:40px 0}
+  .who{font-size:13px;color:var(--muted);margin-bottom:16px}
+  .who b{color:var(--ink);font-weight:600}
+  #form{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ส่งยอดขายรายวัน</h1>
+  <p class="sub" id="dateLabel">—</p>
+
+  <div id="boot" class="loading">กำลังโหลด...</div>
+
+  <div id="msg" class="msg"></div>
+
+  <div id="form">
+    <p class="who" id="who"></p>
+
+    <div class="card">
+      <label for="branch">สาขา</label>
+      <select id="branch"><option value="">— เลือกสาขา —</option></select>
+      <p class="hint">เลือกสาขาที่ต้องการลงยอด (ลงแทนสาขาอื่นได้)</p>
+    </div>
+
+    <div class="card">
+      <label for="amount">ยอดขายรวม (บาท)</label>
+      <div class="amount-row">
+        <input id="amount" type="text" inputmode="numeric" placeholder="0" autocomplete="off">
+        <span class="baht">บาท</span>
+      </div>
+      <p class="hint">ยอดรวมทั้งวันของสาขา ขั้นต่ำ 1 บาท</p>
+    </div>
+
+    <div class="card">
+      <label for="note">หมายเหตุ (ถ้ามี)</label>
+      <textarea id="note" placeholder="เว้นว่างได้"></textarea>
+    </div>
+
+    <button class="submit" id="btn" onclick="submitSales()">ส่งยอดขาย</button>
+  </div>
+</div>
+
+<script>
+// ===== CONFIG =====
+var LIFF_ID = "2010362712-uGq1XJQ6";
+var GAS_URL = "https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec";
+var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
+
+var uid = null;
+var emp = null;
+
+// ===== helpers =====
+function $(id){ return document.getElementById(id); }
+function showMsg(type, text){
+  var m = $("msg");
+  m.className = "msg show " + type;
+  m.innerText = text;
+}
+function hideMsg(){ $("msg").className = "msg"; }
+
+function thaiDate(){
+  var d = new Date();
+  var dd = ("0"+d.getDate()).slice(-2);
+  var mm = ("0"+(d.getMonth()+1)).slice(-2);
+  var yy = d.getFullYear() + 543;
+  return dd + "/" + mm + "/" + yy;
+}
+
+// POST text/plain กัน CORS preflight (ตาม decision ที่ lock)
+function post(payload){
+  return fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  }).then(function(r){ return r.json(); });
+}
+
+// ===== amount: format มี comma ขณะพิมพ์ =====
+$("amount").addEventListener("input", function(e){
+  var raw = e.target.value.replace(/[^\d]/g, "");
+  if(raw.length > 9) raw = raw.slice(0,9); // กันยอดเกินจริง
+  e.target.value = raw ? Number(raw).toLocaleString("en-US") : "";
+});
+function amountValue(){
+  return Number($("amount").value.replace(/[^\d]/g, "")) || 0;
+}
+
+// ===== boot =====
+$("dateLabel").innerText = "วันที่ " + thaiDate();
+
+liff.init({ liffId: LIFF_ID }).then(function(){
+  return liff.getProfile();
+}).then(function(p){
+  uid = p.userId;
+  return post({ token: SHARED_SECRET, userId: uid, action: "getProfile" });
+}).then(function(res){
+  if(!res.ok){
+    $("boot").style.display = "none";
+    showMsg("err", res.error === "USER_NOT_FOUND"
+      ? "ไม่พบบัญชีพนักงานในระบบ ติดต่อแอดมิน"
+      : "เข้าระบบไม่สำเร็จ: " + (res.error || "unknown"));
+    return null;
+  }
+  emp = res.employee;
+  return post({ token: SHARED_SECRET, userId: uid, action: "getBranches" });
+}).then(function(res){
+  if(!res) return;
+  if(!res.ok){
+    $("boot").style.display = "none";
+    showMsg("err", "โหลดรายชื่อสาขาไม่สำเร็จ: " + (res.error || "unknown"));
+    return;
+  }
+  var sel = $("branch");
+  res.branches.forEach(function(b){
+    var o = document.createElement("option");
+    o.value = b.branch_id;
+    o.text = b.branch_name;
+    sel.appendChild(o);
+  });
+  // default = สาขาประจำตัว (เปลี่ยนได้)
+  if(emp && emp.branch_id){ sel.value = String(emp.branch_id); }
+
+  $("who").innerHTML = "ผู้กรอก: <b>" + emp.name + "</b>";
+  $("boot").style.display = "none";
+  $("form").style.display = "block";
+}).catch(function(e){
+  $("boot").style.display = "none";
+  showMsg("err", "เกิดข้อผิดพลาด: " + (e && e.message ? e.message : e));
+});
+
+// ===== submit =====
+function submitSales(){
+  hideMsg();
+  var branch_id = Number($("branch").value);
+  var amount = amountValue();
+
+  if(!branch_id){ showMsg("warn", "กรุณาเลือกสาขา"); return; }
+  if(amount < 1){ showMsg("warn", "กรุณากรอกยอดขาย (อย่างน้อย 1 บาท)"); return; }
+
+  var btn = $("btn");
+  btn.disabled = true;
+  btn.innerText = "กำลังส่ง...";
+
+  post({
+    token: SHARED_SECRET, userId: uid, action: "dailySales",
+    branch_id: branch_id, amount: amount, note: $("note").value.trim()
+  }).then(function(res){
+    if(res.ok){
+      showMsg("ok", "✓ ส่งยอดสำเร็จ\n" + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท");
+      $("form").style.display = "none";
+      return;
+    }
+    btn.disabled = false;
+    btn.innerText = "ส่งยอดขาย";
+    if(res.error === "ALREADY_SUBMITTED"){
+      showMsg("warn", "สาขานี้ลงยอดวันนี้แล้ว: " + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท");
+    } else if(res.error === "INVALID_AMOUNT"){
+      showMsg("warn", "ยอดไม่ถูกต้อง ต้องอย่างน้อย 1 บาท");
+    } else if(res.error === "BRANCH_NOT_FOUND"){
+      showMsg("err", "ไม่พบสาขาที่เลือก");
+    } else {
+      showMsg("err", "ส่งไม่สำเร็จ: " + (res.error || "unknown"));
+    }
+  }).catch(function(e){
+    btn.disabled = false;
+    btn.innerText = "ส่งยอดขาย";
+    showMsg("err", "เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง");
+  });
+}
+</script>
+</body>
+</html>
