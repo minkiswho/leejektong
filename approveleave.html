@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>อนุมัติวันหยุด</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root { --green:#06C755; --red:#E53935; --bg:#f5f6f8; --line:#e3e6ea; --ink:#1a1a1a; --mute:#7a8290; --blue:#3b6fd4; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,"Helvetica Neue","Noto Sans Thai","Sarabun",sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:480px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:20px; margin:8px 0 18px; }
+  h2 { font-size:15px; margin:26px 0 10px; color:var(--mute); }
+  .center { text-align:center; color:var(--mute); padding:40px 0; }
+  .req { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .name { font-size:16px; font-weight:700; }
+  .branch { font-size:13px; color:var(--mute); }
+  .reason { font-size:14px; margin-top:8px; color:#333; }
+  .typetag { font-size:12px; font-weight:700; color:var(--blue); background:#eef3fb; border-radius:20px; padding:2px 10px; display:inline-block; margin-top:6px; }
+  .datebox { display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .datebox label { font-size:13px; color:var(--mute); }
+  .datebox input { flex:1; min-width:150px; border:1px solid var(--line); border-radius:8px; padding:9px; font-size:15px; }
+  .btns { display:flex; gap:10px; margin-top:14px; }
+  .btns button { flex:1; padding:13px; border:0; border-radius:10px; font-size:15px; font-weight:600; color:#fff; }
+  .approve { background:var(--green); }
+  .reject { background:var(--red); }
+  button:disabled { opacity:.5; }
+  .locked { margin-top:12px; padding:10px; border-radius:8px; font-size:13px; text-align:center; background:#f0f2f5; color:var(--mute); }
+  /* ปฏิทินรวม */
+  .calbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .calbar button { width:40px; height:40px; border:1px solid var(--line); background:#fff; border-radius:10px; font-size:18px; color:var(--ink); }
+  .calbar .mlabel { font-size:15px; font-weight:700; }
+  .calcard { background:#fff; border:1px solid var(--line); border-radius:14px; padding:6px 16px; }
+  .calrow { padding:12px 0; border-bottom:1px solid var(--line); }
+  .calrow:last-child { border-bottom:0; }
+  .caldate { font-size:14px; font-weight:700; }
+  .calnames { font-size:14px; color:#333; margin-top:3px; line-height:1.5; }
+  .emptybox { color:var(--mute); font-size:14px; text-align:center; padding:24px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>อนุมัติวันหยุด</h1>
+
+  <!-- คำขอรออนุมัติ -->
+  <div id="loading" class="center">กำลังโหลด…</div>
+  <div id="list"></div>
+  <div id="empty" class="center" style="display:none;">ไม่มีคำขอที่รออนุมัติ</div>
+
+  <!-- ปฏิทินวันหยุดรวม -->
+  <h2>ปฏิทินวันหยุด (ใครหยุดวันไหน)</h2>
+  <div class="calbar">
+    <button id="prevM">‹</button>
+    <div class="mlabel" id="mlabel">-</div>
+    <button id="nextM">›</button>
+  </div>
+  <div class="calcard">
+    <div id="cal"><div class="emptybox">กำลังโหลด…</div></div>
+  </div>
+</div>
+
+<script>
+  var LIFF_ID       = "2010362712-uGq1XJQ6";
+  var GAS_URL       = "https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec";
+  var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
+
+  var USER_ID = null;
+  var curMonth = null; // 'YYYY-MM'
+
+  var TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                   'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+  function $(id){ return document.getElementById(id); }
+
+  async function call(payload){
+    payload.token = SHARED_SECRET;
+    payload.userId = USER_ID;
+    var res = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(payload)
+    });
+    return res.json();
+  }
+
+  async function init(){
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      var prof = await liff.getProfile();
+      USER_ID = prof.userId;
+      // เดือนปัจจุบัน
+      var now = new Date();
+      curMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+      await loadPending();
+      await loadCalendar();
+    } catch (e) {
+      $("loading").textContent = "เปิดผ่านเมนูใน LINE เท่านั้น";
+    }
+  }
+
+  // ── คำขอรออนุมัติ ──
+  async function loadPending(){
+    $("loading").style.display = "block";
+    $("list").innerHTML = "";
+    $("empty").style.display = "none";
+    try {
+      var data = await call({ action: "getPendingLeaves" });
+      $("loading").style.display = "none";
+      if (!data.ok) { $("empty").textContent = data.message || data.error || "โหลดไม่สำเร็จ"; $("empty").style.display="block"; return; }
+      if (!data.pending.length) { $("empty").style.display = "block"; return; }
+      data.pending.forEach(render);
+    } catch (e) {
+      $("loading").textContent = "เชื่อมต่อไม่สำเร็จ";
+    }
+  }
+
+  function render(r){
+    var card = document.createElement("div");
+    card.className = "req";
+    card.innerHTML =
+      '<div class="name">' + r.name + '</div>' +
+      '<div class="branch">' + (r.branch_name||"") + '</div>' +
+      '<div class="typetag">' + r.leave_type + '</div>' +
+      '<div class="reason">เหตุผล: ' + r.reason + '</div>' +
+      '<div class="datebox"><label>วันหยุด</label>' +
+        '<input type="date" value="' + r.date + '"></div>' +
+      '<div class="btns">' +
+        '<button class="approve">อนุมัติ</button>' +
+        '<button class="reject">ปฏิเสธ</button></div>' +
+      '<div class="locked" style="display:none;"></div>';
+
+    var dateInput = card.querySelector("input");
+    var btnA = card.querySelector(".approve");
+    var btnR = card.querySelector(".reject");
+    var locked = card.querySelector(".locked");
+
+    function lockCard(text){
+      card.querySelector(".datebox").style.display = "none";
+      card.querySelector(".btns").style.display = "none";
+      locked.textContent = text;
+      locked.style.display = "block";
+    }
+    function disableBtns(v){ btnA.disabled = v; btnR.disabled = v; }
+
+    btnA.addEventListener("click", async function(){
+      var nd = dateInput.value;
+      if (!nd) { alert("กรุณาเลือกวันที่"); return; }
+      disableBtns(true); btnA.textContent = "…";
+      // ส่ง new_date เสมอ (ถ้าไม่แก้ = ค่าเดิม backend จัดการได้)
+      var res = await call({ action:"decideLeave", request_id:r.request_id, decision:"approve", new_date:nd });
+      if (res.ok) { lockCard("✅ อนุมัติแล้ว — หยุดวันที่ " + (res.final_date||nd)); loadCalendar(); }
+      else if (res.error === "ALREADY_DECIDED") { lockCard("🔒 " + res.message); }
+      else { alert(res.message || res.error || "ไม่สำเร็จ"); disableBtns(false); btnA.textContent="อนุมัติ"; }
+    });
+
+    btnR.addEventListener("click", async function(){
+      if (!confirm("ปฏิเสธคำขอนี้?")) return;
+      disableBtns(true); btnR.textContent = "…";
+      var res = await call({ action:"decideLeave", request_id:r.request_id, decision:"reject" });
+      if (res.ok) { lockCard("❌ ปฏิเสธแล้ว"); }
+      else if (res.error === "ALREADY_DECIDED") { lockCard("🔒 " + res.message); }
+      else { alert(res.message || res.error || "ไม่สำเร็จ"); disableBtns(false); btnR.textContent="ปฏิเสธ"; }
+    });
+
+    $("list").appendChild(card);
+  }
+
+  // ── ปฏิทินรวม ──
+  function setMonthLabel(){
+    var p = curMonth.split('-');
+    var be = Number(p[0]) + 543;
+    $("mlabel").textContent = TH_MONTHS[Number(p[1])-1] + ' ' + be;
+  }
+
+  async function loadCalendar(){
+    setMonthLabel();
+    $("cal").innerHTML = '<div class="emptybox">กำลังโหลด…</div>';
+    try {
+      var data = await call({ action: "getLeaveCalendar", month: curMonth });
+      if (!data.ok) { $("cal").innerHTML = '<div class="emptybox">' + (data.message||"โหลดไม่สำเร็จ") + '</div>'; return; }
+      if (!data.days.length) { $("cal").innerHTML = '<div class="emptybox">เดือนนี้ไม่มีใครหยุด</div>'; return; }
+      var html = "";
+      data.days.forEach(function(d){
+        html +=
+          '<div class="calrow">' +
+            '<div class="caldate">' + d.date_disp + '</div>' +
+            '<div class="calnames">' + d.names.join(', ') + '</div>' +
+          '</div>';
+      });
+      $("cal").innerHTML = html;
+    } catch (e) {
+      $("cal").innerHTML = '<div class="emptybox">เชื่อมต่อไม่สำเร็จ</div>';
+    }
+  }
+
+  function shiftMonth(delta){
+    var p = curMonth.split('-');
+    var y = Number(p[0]), m = Number(p[1]) + delta;
+    if (m < 1) { m = 12; y -= 1; }
+    if (m > 12) { m = 1; y += 1; }
+    curMonth = y + '-' + String(m).padStart(2,'0');
+    loadCalendar();
+  }
+
+  $("prevM").addEventListener("click", function(){ shiftMonth(-1); });
+  $("nextM").addEventListener("click", function(){ shiftMonth(1); });
+
+  init();
+</script>
+</body>
+</html>
