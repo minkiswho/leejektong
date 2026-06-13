@@ -307,9 +307,9 @@
               '<div class="pick-ordered">สั่ง ' + it.qty + '</div>' +
             '</div>' +
             '<div class="qty-ctrl">' +
-              '<button class="qty-btn minus" onclick="pickQty(\'' + esc(o.order_id) + '\',' + iid + ',-1,' + it.qty + ')">−</button>' +
+              '<button class="qty-btn minus" onclick="pickQty(\'' + esc(o.order_id) + '\',' + iid + ',-0.5,' + it.qty + ')">−</button>' +
               '<span class="qty-num' + (cur < it.qty ? ' short' : '') + '" id="q-' + esc(o.order_id) + '-' + iid + '">' + cur + '</span>' +
-              '<button class="qty-btn plus" onclick="pickQty(\'' + esc(o.order_id) + '\',' + iid + ',1,' + it.qty + ')">+</button>' +
+              '<button class="qty-btn plus" onclick="pickQty(\'' + esc(o.order_id) + '\',' + iid + ',0.5,' + it.qty + ')">+</button>' +
             '</div>' +
           '</div>';
       });
@@ -332,6 +332,8 @@
     var cur = qtyState[orderId][itemId];
     var next = cur + delta;
     if (next < 0) next = 0;
+    if (next > 50) next = 50;
+    next = Math.round(next * 2) / 2;   // ล็อกเป็นขั้น 0.5 กัน float เพี้ยน
     qtyState[orderId][itemId] = next;
     var span = el('q-' + orderId + '-' + itemId);
     if (span) {

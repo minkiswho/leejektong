@@ -480,7 +480,7 @@
 
   // ── QTY CHANGE (global เพื่อใช้ inline onclick) ──
   window.changeQty = function(itemId, delta) {
-    qty[itemId] = Math.max(0, (qty[itemId] || 0) + delta);
+    qty[itemId] = Math.max(0, Math.min(50, (qty[itemId] || 0) + delta));
     el('qty-' + itemId).textContent = qty[itemId] || '0';
     var row = el('row-' + itemId);
     if (qty[itemId] > 0) {
