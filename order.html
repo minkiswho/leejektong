@@ -162,6 +162,27 @@
       transition: border-color .15s;
     }
     .note-input:focus { border-color: var(--brand); }
+
+    /* DELIVER DATE PICKER */
+    .deliver-row { margin-bottom: 12px; }
+    .deliver-label { font-size: 12px; font-weight: 600; color: var(--sub); margin-bottom: 6px; display: block; }
+    .deliver-opts { display: flex; gap: 8px; }
+    .deliver-btn {
+      flex: 1; padding: 12px 8px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px; font-weight: 700; font-family: inherit;
+      color: var(--sub); cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      transition: border-color .12s, background .12s, color .12s;
+    }
+    .deliver-btn .d-sub { font-size: 11px; font-weight: 600; opacity: .8; }
+    .deliver-btn.active {
+      border-color: var(--brand);
+      background: #FEF5F5;
+      color: var(--brand);
+    }
     .submit-btn {
       width: 100%; padding: 16px;
       font-size: 16px; font-weight: 800;
@@ -256,6 +277,19 @@
 
 <!-- STICKY FOOTER -->
 <div class="order-footer" id="orderFooter" style="display:none">
+  <div class="deliver-row">
+    <label class="deliver-label">ส่งของวันไหน</label>
+    <div class="deliver-opts">
+      <button type="button" class="deliver-btn active" id="deliverToday" onclick="setDeliver('today')">
+        วันนี้
+        <span class="d-sub" id="dateToday"></span>
+      </button>
+      <button type="button" class="deliver-btn" id="deliverTomorrow" onclick="setDeliver('tomorrow')">
+        พรุ่งนี้
+        <span class="d-sub" id="dateTomorrow"></span>
+      </button>
+    </div>
+  </div>
   <div class="note-row">
     <label class="note-label" for="noteInput">หมายเหตุ (ไม่บังคับ)</label>
     <textarea class="note-input" id="noteInput" rows="2"
@@ -283,6 +317,28 @@
   var uid = null;
   var allItems = [];   // [{item_id, item_name}]
   var qty = {};        // { item_id: number }
+  var deliverChoice = 'today';   // 'today' | 'tomorrow' — default วันนี้
+
+  // ── DELIVER DATE ─────────────────────────────────
+  // โชว์วันที่จริง (พ.ศ.) บนปุ่ม + เก็บ choice ส่ง backend
+  // หมายเหตุ: วันที่บนปุ่มเป็นแค่ตัวช่วยให้พนักงานเห็น — backend คิดวันจริงเอง
+  window.setDeliver = function(choice) {
+    deliverChoice = choice;
+    el('deliverToday').classList.toggle('active', choice === 'today');
+    el('deliverTomorrow').classList.toggle('active', choice === 'tomorrow');
+  };
+
+  function renderDeliverDates() {
+    var d = new Date();
+    el('dateToday').textContent = _fmtThai(d);
+    var t = new Date();
+    t.setDate(t.getDate() + 1);
+    el('dateTomorrow').textContent = _fmtThai(t);
+  }
+  // คืน d/M/พ.ศ. เช่น 14/6/2569
+  function _fmtThai(d) {
+    return d.getDate() + '/' + (d.getMonth() + 1) + '/' + (d.getFullYear() + 543);
+  }
 
   // ── CATEGORY MAP ──────────────────────────────────
   // จาก SUPPLY_LIST 59 รายการ จัด group ตาม item_id
@@ -419,6 +475,7 @@
 
     el('loadingWrap').style.display   = 'none';
     el('orderFooter').style.display   = 'block';
+    renderDeliverDates();
   }
 
   // ── QTY CHANGE (global เพื่อใช้ inline onclick) ──
@@ -446,13 +503,15 @@
     var note = el('noteInput').value.trim();
 
     setLoading(true);
-    callGAS({ action: 'supplyOrder', items: orderItems, note: note })
+    callGAS({ action: 'supplyOrder', items: orderItems, note: note, deliver_choice: deliverChoice })
       .then(function(data) {
         setLoading(false);
         if (data.ok) {
+          var deliverLabel = (deliverChoice === 'tomorrow') ? 'พรุ่งนี้' : 'วันนี้';
           showResult('success',
             '✅', 'ส่งคำสั่งสำเร็จ',
-            'รายการ ' + data.count + ' อย่าง\nสาขา: ' + data.branch_name + '\nมิ้งค์ได้รับแจ้งทาง LINE แล้ว',
+            'รายการ ' + data.count + ' อย่าง\nสาขา: ' + data.branch_name +
+            '\nส่ง: ' + deliverLabel + '\nมิ้งค์ได้รับแจ้งทาง LINE แล้ว',
             true
           );
         } else {
@@ -502,6 +561,7 @@
       if (rEl) rEl.classList.remove('has-qty');
     });
     el('noteInput').value = '';
+    setDeliver('today');
     el('resultOverlay').style.display = 'none';
     updateCartBadge();
     updateSubmitBtn();
