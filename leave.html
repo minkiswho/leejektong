@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>วันหยุด / ลาหยุด</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root { --green:#06C755; --red:#E53935; --bg:#f5f6f8; --line:#e3e6ea; --ink:#1a1a1a; --mute:#7a8290; --blue:#3b6fd4; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,"Helvetica Neue","Noto Sans Thai","Sarabun",sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:480px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:20px; margin:8px 0 16px; }
+  h2 { font-size:15px; margin:22px 0 10px; color:var(--mute); }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; }
+  label { display:block; font-size:14px; color:var(--mute); margin:14px 0 6px; }
+  label:first-child { margin-top:0; }
+  input, textarea, select { width:100%; border:1px solid var(--line); border-radius:10px; padding:12px; font-size:16px; font-family:inherit; background:#fff; }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:var(--green); }
+  textarea { min-height:72px; resize:vertical; }
+  button { width:100%; margin-top:20px; padding:15px; border:0; border-radius:12px; background:var(--green); color:#fff; font-size:17px; font-weight:600; }
+  button:disabled { background:#b9c0c9; }
+  .msg { margin-top:16px; padding:12px 14px; border-radius:10px; font-size:14px; display:none; }
+  .msg.ok { background:#e7f8ee; color:#127a3e; display:block; }
+  .msg.err { background:#fdecec; color:#b32020; display:block; }
+  .hint { font-size:12px; color:var(--mute); margin-top:8px; line-height:1.5; }
+  .note { font-size:13px; color:#8a6d00; background:#fff7df; border:1px solid #f0e2a8; border-radius:10px; padding:10px 12px; margin-top:6px; }
+  .center { text-align:center; color:var(--mute); padding:40px 0; }
+  .dayrow { display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--line); }
+  .dayrow:last-child { border-bottom:0; }
+  .dleft { font-size:15px; }
+  .dtype { font-size:12px; color:var(--mute); margin-top:2px; }
+  .tag { font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; }
+  .tag.plan { background:#eef3fb; color:var(--blue); }
+  .tag.req  { background:#e7f8ee; color:#127a3e; }
+  .tag.pend { background:#fff3e0; color:#b76e00; }
+  .emptybox { color:var(--mute); font-size:14px; text-align:center; padding:18px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>วันหยุด / ลาหยุด</h1>
+  <div id="loading" class="center">กำลังโหลด…</div>
+
+  <div id="content" style="display:none;">
+
+    <!-- วันหยุดของฉัน -->
+    <h2>วันหยุดของฉัน (เดือนนี้เป็นต้นไป)</h2>
+    <div class="card">
+      <div id="mylist"></div>
+    </div>
+    <div class="note">เปลี่ยนแปลงวันหยุดประจำ ให้แจ้งกับเจ้าของร้าน</div>
+
+    <!-- ฟอร์มขอหยุดเพิ่ม -->
+    <h2>ขอหยุดเพิ่ม</h2>
+    <div class="card">
+      <label>วันที่ต้องการหยุด</label>
+      <input id="date" type="date">
+      <label>ประเภท</label>
+      <select id="type">
+        <option value="">— เลือกประเภท —</option>
+        <option value="ป่วย">ลาป่วย</option>
+        <option value="กิจ">ลากิจ</option>
+        <option value="พักร้อน">ลาพักร้อน</option>
+      </select>
+      <label>เหตุผล</label>
+      <textarea id="reason" placeholder="ระบุเหตุผล"></textarea>
+      <div class="hint">* ขอได้ครั้งละ <b>1 วัน ต่อการขอ 1 ครั้ง</b> — ถ้าต้องหยุดหลายวัน เช่นไปต่อบัตร ให้ส่งคำขอแยกทีละวัน<br>* ส่งได้ครั้งละ 1 คำขอ ต้องรอผลก่อนส่งใหม่</div>
+      <button id="submit">ส่งคำขอ</button>
+      <div id="msg" class="msg"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var LIFF_ID       = "2010362712-uGq1XJQ6";
+  var GAS_URL       = "https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec";
+  var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
+
+  var USER_ID = null;
+
+  function $(id){ return document.getElementById(id); }
+  function showMsg(text, ok){
+    var m = $("msg");
+    m.textContent = text;
+    m.className = "msg " + (ok ? "ok" : "err");
+  }
+
+  async function call(payload){
+    payload.token = SHARED_SECRET;
+    payload.userId = USER_ID;
+    var res = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(payload)
+    });
+    return res.json();
+  }
+
+  async function init(){
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      var prof = await liff.getProfile();
+      USER_ID = prof.userId;
+      $("loading").style.display = "none";
+      $("content").style.display = "block";
+      await loadMyLeaves();
+    } catch (e) {
+      $("loading").textContent = "เปิดผ่านเมนูใน LINE เท่านั้น";
+    }
+  }
+
+  async function loadMyLeaves(){
+    var box = $("mylist");
+    box.innerHTML = '<div class="emptybox">กำลังโหลด…</div>';
+    try {
+      var data = await call({ action: "getMyLeaves" });
+      if (!data.ok) { box.innerHTML = '<div class="emptybox">โหลดไม่สำเร็จ</div>'; return; }
+
+      var html = "";
+
+      // คำขอที่รออนุมัติ (ถ้ามี) โชว์บนสุด
+      if (data.pending && data.pending.length) {
+        data.pending.forEach(function(p){
+          html +=
+            '<div class="dayrow">' +
+              '<div class="dleft">' + p.date_disp +
+                '<div class="dtype">' + p.leave_type + '</div></div>' +
+              '<span class="tag pend">รออนุมัติ</span>' +
+            '</div>';
+        });
+      }
+
+      // วันหยุดที่ approved แล้ว
+      if (data.leaves && data.leaves.length) {
+        data.leaves.forEach(function(r){
+          var isReq = (r.source === "requested");
+          var tagClass = isReq ? "req" : "plan";
+          var tagText  = isReq ? "ขอเพิ่ม" : "วันหยุด";
+          html +=
+            '<div class="dayrow">' +
+              '<div class="dleft">' + r.date_disp +
+                '<div class="dtype">' + r.leave_type + '</div></div>' +
+              '<span class="tag ' + tagClass + '">' + tagText + '</span>' +
+            '</div>';
+        });
+      }
+
+      if (!html) html = '<div class="emptybox">ยังไม่มีวันหยุด</div>';
+      box.innerHTML = html;
+    } catch (e) {
+      box.innerHTML = '<div class="emptybox">เชื่อมต่อไม่สำเร็จ</div>';
+    }
+  }
+
+  async function submit(){
+    var date = $("date").value;          // 'YYYY-MM-DD' จาก input type=date
+    var type = $("type").value;
+    var reason = $("reason").value.trim();
+
+    if (!date) { showMsg("กรุณาเลือกวันที่", false); return; }
+    if (!type) { showMsg("กรุณาเลือกประเภท", false); return; }
+    if (!reason) { showMsg("กรุณาระบุเหตุผล", false); return; }
+
+    var btn = $("submit");
+    btn.disabled = true; btn.textContent = "กำลังส่ง…";
+    try {
+      var res = await call({
+        action: "submitLeave",
+        date: date,
+        leave_type: type,
+        reason: reason
+      });
+      if (res.ok) {
+        showMsg("✅ " + (res.message || "ส่งคำขอแล้ว รอการอนุมัติ"), true);
+        $("date").value = ""; $("type").value = ""; $("reason").value = "";
+        await loadMyLeaves();   // refresh รายการ (จะเห็น pending ใหม่)
+      } else {
+        showMsg("❌ " + (res.message || res.error || "ส่งไม่สำเร็จ"), false);
+      }
+    } catch (e) {
+      showMsg("❌ เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง", false);
+    } finally {
+      btn.disabled = false; btn.textContent = "ส่งคำขอ";
+    }
+  }
+
+  $("submit").addEventListener("click", submit);
+  init();
+</script>
+</body>
+</html>
