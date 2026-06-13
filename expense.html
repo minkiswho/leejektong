@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เบิกเงิน</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root { --green:#06C755; --red:#E53935; --bg:#f5f6f8; --line:#e3e6ea; --ink:#1a1a1a; --mute:#7a8290; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,"Helvetica Neue","Noto Sans Thai","Sarabun",sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:480px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:20px; margin:8px 0 20px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; }
+  label { display:block; font-size:14px; color:var(--mute); margin:14px 0 6px; }
+  label:first-child { margin-top:0; }
+  input, textarea { width:100%; border:1px solid var(--line); border-radius:10px; padding:12px; font-size:16px; font-family:inherit; }
+  input:focus, textarea:focus { outline:none; border-color:var(--green); }
+  textarea { min-height:84px; resize:vertical; }
+  .amt { font-size:22px; font-weight:700; text-align:center; }
+  button { width:100%; margin-top:20px; padding:15px; border:0; border-radius:12px; background:var(--green); color:#fff; font-size:17px; font-weight:600; }
+  button:disabled { background:#b9c0c9; }
+  .msg { margin-top:16px; padding:12px 14px; border-radius:10px; font-size:14px; display:none; }
+  .msg.ok { background:#e7f8ee; color:#127a3e; display:block; }
+  .msg.err { background:#fdecec; color:#b32020; display:block; }
+  .hint { font-size:12px; color:var(--mute); margin-top:6px; }
+  .center { text-align:center; color:var(--mute); padding:40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>เบิกเงินล่วงหน้า</h1>
+  <div id="loading" class="center">กำลังโหลด…</div>
+
+  <div id="form" class="card" style="display:none;">
+    <label>จำนวนเงิน (บาท)</label>
+    <input id="amount" class="amt" type="number" inputmode="numeric" min="1" placeholder="0">
+    <label>เหตุผล</label>
+    <textarea id="reason" placeholder="ระบุเหตุผลการเบิก"></textarea>
+    <div class="hint">* ส่งได้ครั้งละ 1 คำขอ ต้องรอผลก่อนส่งใหม่</div>
+    <button id="submit">ส่งคำขอ</button>
+    <div id="msg" class="msg"></div>
+  </div>
+</div>
+
+<script>
+  var LIFF_ID       = "2010362712-uGq1XJQ6";
+  var GAS_URL       = "https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec";
+  var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
+
+  var USER_ID = null;
+
+  function $(id){ return document.getElementById(id); }
+  function showMsg(text, ok){
+    var m = $("msg");
+    m.textContent = text;
+    m.className = "msg " + (ok ? "ok" : "err");
+  }
+
+  async function init(){
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      var prof = await liff.getProfile();
+      USER_ID = prof.userId;
+      $("loading").style.display = "none";
+      $("form").style.display = "block";
+    } catch (e) {
+      $("loading").textContent = "เปิดผ่านเมนูใน LINE เท่านั้น";
+    }
+  }
+
+  async function submit(){
+    var amount = Number($("amount").value);
+    var reason = $("reason").value.trim();
+    if (!(amount >= 1)) { showMsg("กรุณากรอกจำนวนเงิน", false); return; }
+    if (!reason) { showMsg("กรุณาระบุเหตุผล", false); return; }
+
+    var btn = $("submit");
+    btn.disabled = true; btn.textContent = "กำลังส่ง…";
+    try {
+      var res = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          token: SHARED_SECRET,
+          action: "submitExpense",
+          userId: USER_ID,
+          amount: amount,
+          reason: reason
+        })
+      });
+      var data = await res.json();
+      if (data.ok) {
+        showMsg("✅ " + (data.message || "ส่งคำขอแล้ว รอการอนุมัติ"), true);
+        $("amount").value = ""; $("reason").value = "";
+      } else {
+        showMsg("❌ " + (data.message || data.error || "ส่งไม่สำเร็จ"), false);
+      }
+    } catch (e) {
+      showMsg("❌ เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง", false);
+    } finally {
+      btn.disabled = false; btn.textContent = "ส่งคำขอ";
+    }
+  }
+
+  $("submit").addEventListener("click", submit);
+  init();
+</script>
+</body>
+</html>

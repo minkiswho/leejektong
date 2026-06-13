@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>อนุมัติเบิกเงิน</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root { --green:#06C755; --red:#E53935; --bg:#f5f6f8; --line:#e3e6ea; --ink:#1a1a1a; --mute:#7a8290; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,"Helvetica Neue","Noto Sans Thai","Sarabun",sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:480px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:20px; margin:8px 0 18px; }
+  .center { text-align:center; color:var(--mute); padding:40px 0; }
+  .req { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .name { font-size:16px; font-weight:700; }
+  .branch { font-size:13px; color:var(--mute); }
+  .reason { font-size:14px; margin-top:8px; color:#333; }
+  .accum { font-size:12px; color:var(--mute); margin-top:8px; padding:8px 10px; background:#f0f2f5; border-radius:8px; }
+  .amtbox { display:flex; align-items:center; gap:8px; margin-top:12px; }
+  .amtbox label { font-size:13px; color:var(--mute); }
+  .amtbox input { width:120px; border:1px solid var(--line); border-radius:8px; padding:9px; font-size:16px; font-weight:700; text-align:right; }
+  .btns { display:flex; gap:10px; margin-top:14px; }
+  .btns button { flex:1; padding:13px; border:0; border-radius:10px; font-size:15px; font-weight:600; color:#fff; }
+  .approve { background:var(--green); }
+  .reject { background:var(--red); }
+  button:disabled { opacity:.5; }
+  .locked { margin-top:12px; padding:10px; border-radius:8px; font-size:13px; text-align:center; background:#f0f2f5; color:var(--mute); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>คำขอเบิกเงิน</h1>
+  <div id="loading" class="center">กำลังโหลด…</div>
+  <div id="list"></div>
+  <div id="empty" class="center" style="display:none;">ไม่มีคำขอที่รออนุมัติ</div>
+</div>
+
+<script>
+  var LIFF_ID       = "2010362712-uGq1XJQ6";
+  var GAS_URL       = "https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec";
+  var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
+
+  var USER_ID = null;
+
+  function $(id){ return document.getElementById(id); }
+  function money(n){ return Number(n||0).toLocaleString("en-US"); }
+
+  async function call(payload){
+    payload.token = SHARED_SECRET;
+    payload.userId = USER_ID;
+    var res = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(payload)
+    });
+    return res.json();
+  }
+
+  async function init(){
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      var prof = await liff.getProfile();
+      USER_ID = prof.userId;
+      await load();
+    } catch (e) {
+      $("loading").textContent = "เปิดผ่านเมนูใน LINE เท่านั้น";
+    }
+  }
+
+  async function load(){
+    $("loading").style.display = "block";
+    $("list").innerHTML = "";
+    $("empty").style.display = "none";
+    try {
+      var data = await call({ action: "getPendingExpenses" });
+      $("loading").style.display = "none";
+      if (!data.ok) { $("empty").textContent = data.message || data.error || "โหลดไม่สำเร็จ"; $("empty").style.display="block"; return; }
+      if (!data.pending.length) { $("empty").style.display = "block"; return; }
+      data.pending.forEach(render);
+    } catch (e) {
+      $("loading").textContent = "เชื่อมต่อไม่สำเร็จ";
+    }
+  }
+
+  function render(r){
+    var card = document.createElement("div");
+    card.className = "req";
+    card.innerHTML =
+      '<div class="name">' + r.name + '</div>' +
+      '<div class="branch">' + (r.branch_name||"") + ' · ขอ ' + r.date + '</div>' +
+      '<div class="reason">เหตุผล: ' + r.reason + '</div>' +
+      '<div class="accum">เดือนนี้อนุมัติไปแล้ว ' + money(r.monthly_approved) + ' บาท</div>' +
+      '<div class="amtbox"><label>ยอดอนุมัติ</label>' +
+        '<input type="number" min="1" value="' + r.amount_requested + '"></div>' +
+      '<div class="btns">' +
+        '<button class="approve">อนุมัติ</button>' +
+        '<button class="reject">ปฏิเสธ</button></div>' +
+      '<div class="locked" style="display:none;"></div>';
+
+    var amtInput = card.querySelector("input");
+    var btnA = card.querySelector(".approve");
+    var btnR = card.querySelector(".reject");
+    var locked = card.querySelector(".locked");
+
+    function lockCard(text){
+      card.querySelector(".amtbox").style.display = "none";
+      card.querySelector(".btns").style.display = "none";
+      locked.textContent = text;
+      locked.style.display = "block";
+    }
+    function disableBtns(v){ btnA.disabled = v; btnR.disabled = v; }
+
+    btnA.addEventListener("click", async function(){
+      var amt = Number(amtInput.value);
+      if (!(amt >= 1)) { alert("ยอดอนุมัติต้องมากกว่า 0"); return; }
+      disableBtns(true); btnA.textContent = "…";
+      var res = await call({ action:"decideExpense", request_id:r.request_id, decision:"approve", amount_approved:amt });
+      if (res.ok) { lockCard("✅ อนุมัติแล้ว " + money(res.amount_approved) + " บาท"); }
+      else if (res.error === "ALREADY_DECIDED") { lockCard("🔒 " + res.message); }
+      else { alert(res.message || res.error || "ไม่สำเร็จ"); disableBtns(false); btnA.textContent="อนุมัติ"; }
+    });
+
+    btnR.addEventListener("click", async function(){
+      if (!confirm("ปฏิเสธคำขอนี้?")) return;
+      disableBtns(true); btnR.textContent = "…";
+      var res = await call({ action:"decideExpense", request_id:r.request_id, decision:"reject" });
+      if (res.ok) { lockCard("❌ ปฏิเสธแล้ว"); }
+      else if (res.error === "ALREADY_DECIDED") { lockCard("🔒 " + res.message); }
+      else { alert(res.message || res.error || "ไม่สำเร็จ"); disableBtns(false); btnR.textContent="ปฏิเสธ"; }
+    });
+
+    $("list").appendChild(card);
+  }
+
+  init();
+</script>
+</body>
+</html>
