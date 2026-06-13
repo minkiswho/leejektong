@@ -133,6 +133,7 @@
     .btn-leave    .btn-icon { background: #FDF2E9; }
     .btn-approve  .btn-icon { background: #E8F5E9; }
     .btn-approveleave .btn-icon { background: #E8F5E9; }
+    .btn-pick     .btn-icon { background: #FEF5E7; }
     .action-btn .btn-label {
       font-size: 14px; font-weight: 700; line-height: 1.3;
     }
@@ -338,6 +339,11 @@
       <div class="btn-label">อนุมัติวันหยุด</div>
       <div class="btn-sub">สำหรับผู้จัดการ</div>
     </a>
+    <a class="action-btn btn-pick" href="pick.html" id="btnPick" style="display:none;">
+      <div class="btn-icon">🚚</div>
+      <div class="btn-label">จัดของ</div>
+      <div class="btn-sub">จัดของส่งทุกสาขา</div>
+    </a>
   </div>
 </div>
 
@@ -485,6 +491,10 @@
       if (emp.role === 'super_admin' || emp.role === 'manager') {
         document.getElementById('btnApprove').style.display = 'flex';
         document.getElementById('btnApproveLeave').style.display = 'flex';
+      }
+      // โชว์ปุ่มจัดของ เฉพาะร้านหลัก (branch_id 15) หรือ super_admin
+      if (Number(emp.branch_id) === 15 || emp.role === 'super_admin') {
+        document.getElementById('btnPick').style.display = 'flex';
       }
     })
     .catch(function(e) {
