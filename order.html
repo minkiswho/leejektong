@@ -233,6 +233,28 @@
       margin-top: 8px;
     }
 
+    /* BRANCH SELECT */
+    .branch-section { margin: 12px 16px 0; }
+    .branch-label {
+      font-size: 12px; font-weight: 700; color: var(--sub);
+      margin-bottom: 6px; display: block;
+    }
+    .branch-select {
+      width: 100%;
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 13px 12px; padding-right: 36px;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      color: var(--text); cursor: pointer; outline: none;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23922B21' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
+      transition: border-color .15s;
+    }
+    .branch-select:focus { border-color: var(--brand); }
+    .branch-hint { font-size: 11px; color: var(--sub); margin-top: 6px; }
+
     /* BOTTOM SPACER */
     .spacer-bottom { height: 160px; }
   </style>
@@ -263,6 +285,13 @@
   <strong id="barName">...</strong>
   <span style="margin-left:auto">สาขา:</span>
   <strong id="barBranch">...</strong>
+</div>
+
+<!-- BRANCH SELECT (สั่งแทนสาขาอื่นได้) -->
+<div class="branch-section" id="branchSection" style="display:none">
+  <label class="branch-label" for="branchSelect">สั่งให้สาขา</label>
+  <select class="branch-select" id="branchSelect"></select>
+  <p class="branch-hint">ค่าเริ่มต้น = สาขาของคุณ — เปลี่ยนได้ถ้าสั่งแทนสาขาอื่น</p>
 </div>
 
 <!-- LOADING -->
@@ -315,9 +344,35 @@
 <script>
 (function() {
   var uid = null;
+  var emp = null;             // โปรไฟล์พนักงาน (เก็บไว้ตั้ง default สาขา)
+  var selectedBranchId = null; // สาขาที่เลือกบน dropdown
   var allItems = [];   // [{item_id, item_name}]
   var qty = {};        // { item_id: number }
   var deliverChoice = 'today';   // 'today' | 'tomorrow' — default วันนี้
+
+  // ── BRANCH DROPDOWN ──────────────────────────────
+  // เติมรายชื่อสาขาลง dropdown + ตั้ง default = สาขาพนักงาน
+  function renderBranches(branches, defaultBranchId) {
+    var sel = el('branchSelect');
+    sel.innerHTML = '';
+    branches.forEach(function(b) {
+      var o = document.createElement('option');
+      o.value = b.branch_id;
+      o.textContent = b.branch_name;
+      sel.appendChild(o);
+    });
+    // default = สาขาประจำตัว (ถ้ามี) — เปลี่ยนได้
+    if (defaultBranchId) {
+      sel.value = String(defaultBranchId);
+    }
+    selectedBranchId = Number(sel.value) || null;
+
+    sel.addEventListener('change', function() {
+      selectedBranchId = Number(sel.value) || null;
+    });
+
+    el('branchSection').style.display = 'block';
+  }
 
   // ── DELIVER DATE ─────────────────────────────────
   // โชว์วันที่จริง (พ.ศ.) บนปุ่ม + เก็บ choice ส่ง backend
@@ -497,13 +552,19 @@
     var selectedItems = allItems.filter(function(it){ return qty[it.item_id] > 0; });
     if (!selectedItems.length) return;
 
+    // guard: ต้องมีสาขาที่เลือก (ปกติมี default อยู่แล้ว)
+    if (!selectedBranchId) {
+      showResult('fail', '❌', 'ยังไม่ได้เลือกสาขา', 'กรุณาเลือกสาขาที่จะสั่งให้', false);
+      return;
+    }
+
     var orderItems = selectedItems.map(function(it) {
       return { item_id: it.item_id, item_name: it.item_name, qty: qty[it.item_id] };
     });
     var note = el('noteInput').value.trim();
 
     setLoading(true);
-    callGAS({ action: 'supplyOrder', items: orderItems, note: note, deliver_choice: deliverChoice })
+    callGAS({ action: 'supplyOrder', branch_id: selectedBranchId, items: orderItems, note: note, deliver_choice: deliverChoice })
       .then(function(data) {
         setLoading(false);
         if (data.ok) {
@@ -516,10 +577,11 @@
           );
         } else {
           var errMsgs = {
-            UNAUTHORIZED:   'ไม่ได้รับอนุญาต ออกแล้วเข้า LINE ใหม่',
-            USER_NOT_FOUND: 'ไม่พบข้อมูลพนักงาน ติดต่อมิ้งค์',
-            EMPTY_ORDER:    'กรุณาเลือกอย่างน้อย 1 รายการ',
-            BUSY_TRY_AGAIN: 'ระบบยุ่งชั่วคราว กรุณาลองใหม่',
+            UNAUTHORIZED:    'ไม่ได้รับอนุญาต ออกแล้วเข้า LINE ใหม่',
+            USER_NOT_FOUND:  'ไม่พบข้อมูลพนักงาน ติดต่อมิ้งค์',
+            EMPTY_ORDER:     'กรุณาเลือกอย่างน้อย 1 รายการ',
+            BRANCH_NOT_FOUND:'ไม่พบสาขาที่เลือก',
+            BUSY_TRY_AGAIN:  'ระบบยุ่งชั่วคราว กรุณาลองใหม่',
           };
           showResult('fail', '❌', 'เกิดข้อผิดพลาด',
             errMsgs[data.error] || 'รหัส: ' + data.error, false);
@@ -584,25 +646,41 @@
       if (name)   { el('barName').textContent   = name;   el('headerBranch').textContent = branch || ''; }
       if (branch) { el('barBranch').textContent = branch; }
 
-      // โหลด supply list
+      // โหลดโปรไฟล์ก่อน (ต้องรู้ branch_id ของพนักงานก่อน เพื่อตั้ง default สาขา)
       return callGAS({ action: 'getProfile' }).then(function(pData) {
-        // เติม name/branch ถ้ายังไม่มีใน session
-        if (pData.ok && !name) {
-          el('barName').textContent     = pData.employee.name;
-          el('barBranch').textContent   = pData.employee.branch_name;
-          el('headerBranch').textContent = pData.employee.branch_name;
+        if (pData.ok) {
+          emp = pData.employee;
+          // เติม name/branch ถ้ายังไม่มีใน session
+          if (!name) {
+            el('barName').textContent      = emp.name;
+            el('barBranch').textContent    = emp.branch_name;
+            el('headerBranch').textContent = emp.branch_name;
+          }
         }
-        return callGAS({ action: 'getSupplyList' });
+        // โหลดสาขา + รายการสินค้า พร้อมกัน (คู่ขนาน — ไม่ให้หน้าจอช้า)
+        return Promise.all([
+          callGAS({ action: 'getBranches' }),
+          callGAS({ action: 'getSupplyList' })
+        ]);
       });
     })
-    .then(function(data) {
-      if (!data) return;
-      if (data.ok && data.items && data.items.length) {
-        renderItems(data.items);
+    .then(function(results) {
+      if (!results) return;
+      var branchData = results[0];
+      var listData   = results[1];
+
+      // เติม dropdown สาขา (default = สาขาพนักงาน)
+      if (branchData && branchData.ok && branchData.branches && branchData.branches.length) {
+        renderBranches(branchData.branches, emp ? emp.branch_id : null);
+      }
+
+      // เติมรายการสินค้า
+      if (listData && listData.ok && listData.items && listData.items.length) {
+        renderItems(listData.items);
       } else {
         el('loadingWrap').innerHTML =
           '<div style="text-align:center;color:#922B21;font-size:14px">' +
-          '❌ โหลดรายการไม่ได้<br><small>' + (data.error||'') + '</small></div>';
+          '❌ โหลดรายการไม่ได้<br><small>' + ((listData && listData.error) || '') + '</small></div>';
       }
     })
     .catch(function(e) {
