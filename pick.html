@@ -97,6 +97,15 @@
     .order-top {
       display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
     }
+    /* 🔴 v11: ป้ายแผนก ครัว/ของแห้ง */
+    .dept-row { margin-bottom: 6px; }
+    .dept-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 13px; font-weight: 800;
+      padding: 4px 12px; border-radius: 8px;
+    }
+    .dept-tag.kitchen { background: #FDECEA; color: var(--brand); }
+    .dept-tag.dry     { background: #EAF2FB; color: #1F5C99; }
     .branch-name { font-size: 15px; font-weight: 800; flex: 1; min-width: 0; }
     .deliver-tag {
       font-size: 12px; font-weight: 700;
@@ -277,6 +286,11 @@
       html +=
         '<div class="order-card" id="card-' + esc(o.order_id) + '">' +
           '<div class="order-head">' +
+            '<div class="dept-row">' +
+              '<span class="dept-tag ' + (o.category === 'kitchen' ? 'kitchen' : 'dry') + '">' +
+                esc(o.dept_icon) + ' ' + esc(o.dept_label) +
+              '</span>' +
+            '</div>' +
             '<div class="order-top">' +
               '<span class="branch-name">' + esc(o.branch_name) + '</span>' +
               '<span class="deliver-tag ' + (isToday ? 'today' : 'tmr') + '">' +
