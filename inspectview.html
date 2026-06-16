@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ผลตรวจสาขา</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root { --green:#06C755; --red:#E53935; --bg:#f5f6f8; --line:#e3e6ea; --ink:#1a1a1a; --mute:#7a8290; --blue:#3b6fd4;
+          --green-bg:#eef9f1; --green-ink:#127a3e; --red-bg:#fdecec; --red-ink:#b32020; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,"Helvetica Neue","Noto Sans Thai","Sarabun",sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:480px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:20px; margin:8px 0 16px; }
+  .center { text-align:center; color:var(--mute); padding:40px 0; }
+
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:18px; }
+  .card-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
+  .card-title { font-size:16px; font-weight:700; }
+  .card-tag { font-size:11px; color:var(--mute); }
+
+  /* View 1 — feed */
+  .feedrow { padding:12px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  .feedrow:last-child { border-bottom:0; }
+  .feed-date { font-size:17px; font-weight:700; }
+  .feed-by { font-size:13px; color:var(--mute); margin-top:2px; }
+  .branch-badge { font-size:12px; padding:4px 11px; border-radius:20px; background:#eef3fb; color:var(--blue); font-weight:600; flex-shrink:0; margin-left:10px; }
+
+  /* View 2 — counters + branch rows */
+  .counters { display:flex; gap:18px; font-size:13px; margin-bottom:12px; padding:0 2px; }
+  .counters .ct { display:flex; align-items:center; gap:6px; }
+  .ct-dot { width:9px; height:9px; border-radius:50%; }
+  .ct-dot.g { background:var(--green); }
+  .ct-dot.r { background:var(--red); }
+  .brow { display:flex; justify-content:space-between; align-items:center; padding:11px 13px; border-radius:10px; margin-bottom:7px; }
+  .brow:last-child { margin-bottom:0; }
+  .brow.ok  { background:var(--green-bg); }
+  .brow.no  { background:var(--red-bg); }
+  .bname { font-size:14px; font-weight:600; }
+  .brow.ok .bname { color:var(--green-ink); }
+  .brow.no .bname { color:var(--red-ink); }
+  .bright { font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .bcount { color:var(--green-ink); font-weight:600; }
+  .chip { font-size:11px; background:#fff; border:1px solid #cdeed8; color:var(--green-ink); border-radius:14px; padding:2px 8px; }
+  .bno { color:var(--red-ink); font-size:13px; }
+  .emptybox { color:var(--mute); font-size:14px; text-align:center; padding:18px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ผลตรวจสาขา</h1>
+  <div id="loading" class="center">กำลังโหลด…</div>
+
+  <div id="content" style="display:none;">
+
+    <!-- View 1 — ประวัติการตรวจ -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">🕘 ประวัติการตรวจ</span>
+      </div>
+      <div id="feed"></div>
+    </div>
+
+    <!-- View 2 — สถานะเดือนนี้ -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📍 สถานะเดือนนี้</span>
+        <span class="card-tag" id="monthTag"></span>
+      </div>
+      <div class="counters">
+        <span class="ct"><span class="ct-dot g"></span>ตรวจแล้ว <b id="ctChecked">0</b></span>
+        <span class="ct"><span class="ct-dot r"></span>ตกหล่น <b id="ctMissed">0</b></span>
+      </div>
+      <div id="status"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var LIFF_ID       = "2010362712-uGq1XJQ6";
+  var GAS_URL       = "https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec";
+  var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
+
+  var USER_ID = null;
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>]/g, function(c){
+    return c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"; }); }
+
+  function call(payload){
+    payload.token = SHARED_SECRET;
+    payload.userId = USER_ID;
+    return fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    }).then(function(r){ return r.json(); });
+  }
+
+  function init(){
+    liff.init({ liffId: LIFF_ID }).then(function(){
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return new Promise(function(){}); }
+      return liff.getProfile();
+    }).then(function(prof){
+      if (!prof) return;
+      USER_ID = prof.userId;
+      return loadAll();
+    }).catch(function(){
+      $("loading").textContent = "เปิดผ่านเมนูใน LINE เท่านั้น";
+    });
+  }
+
+  function loadAll(){
+    // โหลด 2 view พร้อมกัน
+    return Promise.all([
+      call({ action: "getInspectFeed" }),
+      call({ action: "getInspectStatus" })
+    ]).then(function(arr){
+      var feedRes = arr[0], statRes = arr[1];
+
+      // guard: ถ้าไม่มีสิทธิ์
+      if (feedRes && feedRes.error === "FORBIDDEN") {
+        $("loading").textContent = "หน้านี้สำหรับผู้จัดการและแอดมินเท่านั้น";
+        return;
+      }
+      if ((!feedRes || !feedRes.ok) && (!statRes || !statRes.ok)) {
+        $("loading").textContent = "โหลดไม่สำเร็จ ลองใหม่อีกครั้ง";
+        return;
+      }
+
+      renderFeed(feedRes);
+      renderStatus(statRes);
+
+      $("loading").style.display = "none";
+      $("content").style.display = "block";
+    });
+  }
+
+  // ===== View 1 — ประวัติ =====
+  function renderFeed(res){
+    var box = $("feed");
+    if (!res || !res.ok || !res.feed || !res.feed.length) {
+      box.innerHTML = '<div class="emptybox">ยังไม่มีประวัติการตรวจ</div>';
+      return;
+    }
+    var html = "";
+    res.feed.forEach(function(f){
+      html +=
+        '<div class="feedrow">' +
+          '<div>' +
+            '<div class="feed-date">' + esc(f.date_disp) + '</div>' +
+            '<div class="feed-by">โดย ' + esc(f.name) + '</div>' +
+          '</div>' +
+          '<span class="branch-badge">' + esc(f.branch_name) + '</span>' +
+        '</div>';
+    });
+    box.innerHTML = html;
+  }
+
+  // ===== View 2 — สถานะเดือนนี้ =====
+  function renderStatus(res){
+    var box = $("status");
+    if (!res || !res.ok) {
+      box.innerHTML = '<div class="emptybox">โหลดสถานะไม่สำเร็จ</div>';
+      return;
+    }
+    $("monthTag").textContent = res.month_disp || "";
+    $("ctChecked").textContent = res.checked;
+    $("ctMissed").textContent  = res.missed;
+
+    var html = "";
+    res.branches.forEach(function(b){
+      if (b.inspected) {
+        var chips = (b.dates || []).map(function(d){
+          return '<span class="chip">' + esc(d) + '</span>';
+        }).join("");
+        html +=
+          '<div class="brow ok">' +
+            '<span class="bname">' + esc(b.branch_name) + '</span>' +
+            '<span class="bright"><span class="bcount">' + b.count + ' ครั้ง</span>' + chips + '</span>' +
+          '</div>';
+      } else {
+        html +=
+          '<div class="brow no">' +
+            '<span class="bname">' + esc(b.branch_name) + '</span>' +
+            '<span class="bno">ยังไม่ตรวจ</span>' +
+          '</div>';
+      }
+    });
+    box.innerHTML = html;
+  }
+
+  init();
+</script>
+</body>
+</html>
