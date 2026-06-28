@@ -144,9 +144,16 @@
     }
     .leave-foot {
       background: var(--leave-bg);
-      padding: 9px 16px;
-      font-size: 12px; color: var(--leave); font-weight: 600;
+      padding: 11px 16px;
       text-align: center;
+    }
+    .leave-foot .lf-line {
+      font-size: 12px; color: var(--leave); font-weight: 600;
+      line-height: 1.5;
+    }
+    .leave-foot .lf-warn {
+      margin-top: 4px;
+      color: var(--brand); font-weight: 700;
     }
     .leave-skel { padding: 4px 16px 14px; }
     .leave-skel .ls-row { height: 14px; margin: 12px 0; }
@@ -378,7 +385,10 @@
     </div>
     <div class="leave-list" id="leaveList" style="display:none"></div>
     <div class="leave-empty" id="leaveEmpty" style="display:none">ยังไม่มีวันหยุดในช่วงนี้</div>
-    <div class="leave-foot">เปลี่ยนแปลงวันหยุดประจำ แจ้งกับเจ้าของร้าน</div>
+    <div class="leave-foot">
+      <div class="lf-line">ขอหยุดเพิ่ม ให้กดปุ่ม "ลาหยุด"</div>
+      <div class="lf-line lf-warn">เปลี่ยนแปลงวันหยุดและหยุดกระทันหัน จะมีค่าใช้จ่าย เนื่องจากต้องส่งคนไปแทน</div>
+    </div>
   </div>
 </div>
 
