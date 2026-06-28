@@ -8,17 +8,22 @@
   <style>
     /* ── CONFIG ─────────────────────────────────── */
     :root {
-      --brand:      #C0392B;   /* แดงเข้ม — สีร้าน */
+      --brand:      #C0392B;   /* แดงเข้ม — สีร้าน (CI) */
       --brand-dark: #922B21;
       --amber:      #E67E22;
-      --surface:    #FDF6EC;   /* ครีมอุ่น */
+      --surface:    #F4F6F8;   /* เทาอมฟ้าอ่อน — soft modern */
+      --surface-2:  #ECEFF3;   /* เทาเข้มขึ้นนิด สำหรับ chip/divider */
       --card:       #FFFFFF;
-      --text:       #2C1A0E;
-      --sub:        #7B6252;
-      --border:     #E8D5C4;
+      --text:       #1F2733;   /* น้ำเงินเทาเข้ม อ่านสบายตา */
+      --sub:        #8794A3;   /* เทากลาง */
+      --border:     #E6EAF0;   /* ขอบบางโทนเย็น */
       --success:    #1E8449;
-      --radius:     16px;
-      --shadow:     0 2px 12px rgba(44,26,14,.10);
+      --leave:      #5B7FA6;   /* ฟ้าอมเทา — accent กล่องวันหยุด */
+      --leave-bg:   #EEF3F9;
+      --radius:     20px;
+      --radius-sm:  14px;
+      --shadow:     0 4px 20px rgba(31,39,51,.06), 0 1px 3px rgba(31,39,51,.04);
+      --shadow-sm:  0 2px 10px rgba(31,39,51,.05);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -34,26 +39,28 @@
 
     /* ── HEADER ─────────────────────────────────── */
     .header {
-      background: var(--brand);
-      padding: 20px 20px 18px;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+      padding: 22px 20px 24px;
       display: flex;
       align-items: center;
       gap: 12px;
+      border-radius: 0 0 24px 24px;
+      box-shadow: 0 4px 18px rgba(146,43,33,.18);
     }
     .header-logo {
       background: #fff;
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 8px 12px;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+      box-shadow: 0 2px 10px rgba(0,0,0,.10);
     }
     .header-logo img { height: 38px; display: block; }
     .header-title { color: #fff; }
     .header-title p  { font-size: 13px; font-weight: 600; opacity: .92; letter-spacing: .02em; }
 
     /* ── PROFILE CARD ────────────────────────────── */
-    .profile-wrap { padding: 16px 16px 0; }
+    .profile-wrap { padding: 0 16px; margin-top: -14px; position: relative; z-index: 2; }
     .profile-card {
       background: var(--card);
       border-radius: var(--radius);
@@ -64,9 +71,10 @@
     }
     .profile-avatar {
       width: 48px; height: 48px; border-radius: 50%;
-      background: var(--brand);
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
       display: flex; align-items: center; justify-content: center;
       font-size: 22px; flex-shrink: 0; overflow: hidden;
+      box-shadow: 0 2px 8px rgba(192,57,43,.25);
     }
     .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .profile-info { flex: 1; min-width: 0; }
@@ -84,7 +92,7 @@
       0%,100% { opacity:1; } 50% { opacity:.4; }
     }
     .skeleton {
-      background: linear-gradient(90deg, #EDE0D4 25%, #F7EFE6 50%, #EDE0D4 75%);
+      background: linear-gradient(90deg, #E6EAF0 25%, #F2F5F8 50%, #E6EAF0 75%);
       background-size: 200% 100%;
       animation: shimmer 1.4s infinite;
       border-radius: 6px;
@@ -93,11 +101,62 @@
     .sk-name   { height: 16px; width: 120px; }
     .sk-branch { height: 12px; width: 80px; margin-top: 6px; }
 
+    /* ── LEAVE PREVIEW CARD ──────────────────────── */
+    .leave-wrap { padding: 14px 16px 0; }
+    .leave-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .leave-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 14px 16px 10px;
+    }
+    .leave-head .lh-icon {
+      width: 30px; height: 30px; border-radius: 9px;
+      background: var(--leave-bg); color: var(--leave);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .leave-head .lh-title { font-size: 14px; font-weight: 700; color: var(--text); }
+    .leave-head .lh-sub   { font-size: 11px; color: var(--sub); margin-top: 1px; }
+    .leave-list { padding: 0 16px 6px; }
+    .leave-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 0;
+      border-top: 1px solid var(--border);
+    }
+    .leave-row .lr-date {
+      font-size: 15px; font-weight: 700; color: var(--text);
+      flex-shrink: 0; min-width: 96px;
+    }
+    .leave-row .lr-type { font-size: 12px; color: var(--sub); flex: 1; }
+    .leave-row .lr-tag {
+      font-size: 11px; font-weight: 700;
+      background: var(--leave-bg); color: var(--leave);
+      border-radius: 100px; padding: 3px 11px; flex-shrink: 0;
+    }
+    .leave-empty {
+      padding: 8px 16px 18px;
+      font-size: 13px; color: var(--sub); text-align: center;
+    }
+    .leave-foot {
+      background: var(--leave-bg);
+      padding: 9px 16px;
+      font-size: 12px; color: var(--leave); font-weight: 600;
+      text-align: center;
+    }
+    .leave-skel { padding: 4px 16px 14px; }
+    .leave-skel .ls-row { height: 14px; margin: 12px 0; }
+
     /* ── SECTION ─────────────────────────────────── */
-    .section { padding: 20px 16px 0; }
+    .section { padding: 18px 16px 0; }
     .section-label {
       font-size: 11px; font-weight: 700; letter-spacing: .08em;
       color: var(--sub); text-transform: uppercase; margin-bottom: 12px;
+      padding-left: 2px;
     }
 
     /* ── ACTION BUTTONS (Phase 1) ────────────────── */
@@ -108,35 +167,35 @@
     }
     .action-btn {
       background: var(--card);
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 20px 14px 18px;
+      padding: 22px 14px 18px;
       text-align: center;
       text-decoration: none;
       color: var(--text);
       display: flex; flex-direction: column;
       align-items: center; gap: 10px;
-      box-shadow: var(--shadow);
-      transition: transform .12s, box-shadow .12s, border-color .12s;
+      box-shadow: var(--shadow-sm);
+      transition: transform .12s, box-shadow .12s;
       -webkit-user-select: none; user-select: none;
     }
     .action-btn:active { transform: scale(.96); box-shadow: none; }
     .action-btn .btn-icon {
-      width: 52px; height: 52px; border-radius: 14px;
+      width: 54px; height: 54px; border-radius: 16px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 26px;
+      font-size: 27px;
     }
     .btn-checkin  .btn-icon { background: #FDECEA; }
-    .btn-order    .btn-icon { background: #FEF5E7; }
-    .btn-sales    .btn-icon { background: #EAF6EE; }
-    .btn-expense  .btn-icon { background: #EAF0F6; }
-    .btn-leave    .btn-icon { background: #FDF2E9; }
-    .btn-approve  .btn-icon { background: #E8F5E9; }
-    .btn-approveleave .btn-icon { background: #E8F5E9; }
-    .btn-pick     .btn-icon { background: #FEF5E7; }
-    .btn-inspect  .btn-icon { background: #EAF0F6; }
-    .btn-inspectview .btn-icon { background: #EAF6EE; }
-    .btn-sop      .btn-icon { background: #FEF5E7; }
+    .btn-order    .btn-icon { background: #FFF4E5; }
+    .btn-sales    .btn-icon { background: #E7F5EC; }
+    .btn-expense  .btn-icon { background: #EAF0F8; }
+    .btn-leave    .btn-icon { background: #F0ECF9; }
+    .btn-approve  .btn-icon { background: #E7F5EC; }
+    .btn-approveleave .btn-icon { background: #E7F5EC; }
+    .btn-pick     .btn-icon { background: #FFF4E5; }
+    .btn-inspect  .btn-icon { background: #EAF0F8; }
+    .btn-inspectview .btn-icon { background: #E7F5EC; }
+    .btn-sop      .btn-icon { background: #FFF4E5; }
     .action-btn .btn-label {
       font-size: 14px; font-weight: 700; line-height: 1.3;
     }
@@ -303,6 +362,26 @@
   </div>
 </div>
 
+<!-- LEAVE PREVIEW (วันหยุดของฉัน) -->
+<div class="leave-wrap" id="leaveWrap" style="display:none">
+  <div class="leave-card">
+    <div class="leave-head">
+      <div class="lh-icon">📅</div>
+      <div>
+        <div class="lh-title">วันหยุดของฉัน</div>
+        <div class="lh-sub">เดือนนี้เป็นต้นไป</div>
+      </div>
+    </div>
+    <div class="leave-skel" id="leaveSkel">
+      <div class="ls-row skeleton"></div>
+      <div class="ls-row skeleton"></div>
+    </div>
+    <div class="leave-list" id="leaveList" style="display:none"></div>
+    <div class="leave-empty" id="leaveEmpty" style="display:none">ยังไม่มีวันหยุดในช่วงนี้</div>
+    <div class="leave-foot">เปลี่ยนแปลงวันหยุดประจำ แจ้งกับเจ้าของร้าน</div>
+  </div>
+</div>
+
 <!-- PHASE 1 ACTIONS -->
 <div class="section">
   <div class="section-label">เมนูหลัก</div>
@@ -440,6 +519,53 @@
     }).then(function(r){ return r.json(); });
   }
 
+  // ── LEAVE PREVIEW ─────────────────────────────
+  function thaiType(t) {
+    if (!t) return 'วันหยุด';
+    if (t === 'planned') return 'วันหยุดประจำ';
+    return t;  // ป่วย / กิจ / พักร้อน
+  }
+
+  function renderLeaves(leaves) {
+    var skel  = document.getElementById('leaveSkel');
+    var list  = document.getElementById('leaveList');
+    var empty = document.getElementById('leaveEmpty');
+    skel.style.display = 'none';
+
+    if (!leaves || leaves.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < leaves.length; i++) {
+      var lv = leaves[i];
+      var tag = (lv.source === 'planned') ? 'วันหยุด' : 'ขอเพิ่ม';
+      html += '<div class="leave-row">'
+            +   '<span class="lr-date">' + (lv.date_disp || lv.date || '') + '</span>'
+            +   '<span class="lr-type">' + thaiType(lv.leave_type) + '</span>'
+            +   '<span class="lr-tag">' + tag + '</span>'
+            + '</div>';
+    }
+    list.innerHTML = html;
+    list.style.display = 'block';
+  }
+
+  function loadMyLeaves() {
+    document.getElementById('leaveWrap').style.display = 'block';
+    callGAS('getMyLeaves')
+      .then(function(data) {
+        if (data && data.ok) {
+          renderLeaves(data.leaves || []);
+        } else {
+          renderLeaves([]);
+        }
+      })
+      .catch(function() {
+        renderLeaves([]);
+      });
+  }
+
   // ── INIT ──────────────────────────────────────
   var initDone = false;
 
@@ -519,6 +645,8 @@
         document.getElementById('btnInspect').style.display = 'flex';
         document.getElementById('btnInspectView').style.display = 'flex';
       }
+      // โหลดวันหยุดของฉันมาโชว์บนสุด
+      loadMyLeaves();
     })
     .catch(function(e) {
       if (initDone) return;
