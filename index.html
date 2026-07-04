@@ -202,6 +202,7 @@
     .btn-pick     .btn-icon { background: #FFF4E5; }
     .btn-inspect  .btn-icon { background: #EAF0F8; }
     .btn-inspectview .btn-icon { background: #E7F5EC; }
+    .btn-revenue  .btn-icon { background: #EAF0F8; }
     .btn-sop      .btn-icon { background: #FFF4E5; }
     .action-btn .btn-label {
       font-size: 14px; font-weight: 700; line-height: 1.3;
@@ -451,6 +452,11 @@
       <div class="btn-label">ดูผลตรวจ</div>
       <div class="btn-sub">ประวัติ–สถานะเดือนนี้</div>
     </a>
+    <a class="action-btn btn-revenue" href="LJK_Dashboard_mockup.html" id="btnRevenue" style="display:none;">
+      <div class="btn-icon">🏬</div>
+      <div class="btn-label">รวมยอดห้าง</div>
+      <div class="btn-sub">ดูรายรับ–ยอดหักห้าง</div>
+    </a>
   </div>
 </div>
 
@@ -641,10 +647,11 @@
       sessionStorage.setItem('lj_branch_id', emp.branch_id);
       sessionStorage.setItem('lj_branch_name', emp.branch_name);
       sessionStorage.setItem('lj_role', emp.role);
-      // โชว์ปุ่มอนุมัติ เฉพาะ super_admin / manager
+      // โชว์ปุ่มอนุมัติ + รวมยอดห้าง เฉพาะ super_admin / manager
       if (emp.role === 'super_admin' || emp.role === 'manager') {
         document.getElementById('btnApprove').style.display = 'flex';
         document.getElementById('btnApproveLeave').style.display = 'flex';
+        document.getElementById('btnRevenue').style.display = 'flex';
       }
       // โชว์ปุ่มจัดของ เฉพาะร้านหลัก (branch_id 15) หรือ super_admin
       if (Number(emp.branch_id) === 15 || emp.role === 'super_admin') {
