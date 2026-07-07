@@ -64,6 +64,10 @@
   .pill{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;color:#fff}
   .s0{background:#94a3b8}.s1{background:var(--amber)}.s2{background:var(--cyan)}.s3{background:var(--green)}
   .due{font-weight:600}
+  .seg{display:inline-flex;gap:4px;padding:4px;background:var(--glass2);border-radius:12px;border:1px solid rgba(255,255,255,.8)}
+  .seg button{border:0;background:transparent;color:var(--muted);font-family:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:9px;cursor:pointer;transition:.2s}
+  .seg button.active{background:#fff;color:var(--ink);box-shadow:0 3px 9px rgba(31,41,55,.12)}
+  .trendhead{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px}
   .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:10px}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .legend i{width:13px;height:13px;border-radius:50%;display:inline-block}
@@ -99,6 +103,17 @@
       <div class="kpi glass"><div class="lab"><span class="dot" style="background:var(--amber)"></span>ยอดวางบิลรวม</div><div class="val" id="k2"></div><div class="note">หลังหัก GP</div></div>
       <div class="kpi glass"><div class="lab"><span class="dot" style="background:var(--rose)"></span>ค่าใช้จ่ายรวม</div><div class="val" id="k3"></div><div class="note">incl VAT</div></div>
       <div class="kpi glass"><div class="lab"><span class="dot" style="background:var(--green)"></span>Net Received</div><div class="val" id="k4"></div><div class="note">วางบิล − ค่าใช้จ่าย</div></div>
+    </div>
+    <div class="card glass full" style="margin-bottom:12px">
+      <div class="trendhead">
+        <h3 style="margin:0">แนวโน้มยอดขายจริงรายเดือน — ทั้งปี 2026</h3>
+        <div class="seg" id="trendToggle">
+          <button data-m="total" class="active">รวมทุกสาขา</button>
+          <button data-m="branch">แยกรายสาขา</button>
+        </div>
+      </div>
+      <div id="trendNote" class="note" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+      <div class="cbox"><canvas id="ct"></canvas></div>
     </div>
     <div class="grid">
       <div class="card glass"><h3>ยอดขายจริง vs ยอดวางบิล รายสาขา</h3><div class="cbox"><canvas id="c1"></canvas></div></div>
@@ -219,6 +234,16 @@ const R=[
  ['BIGCราชดำริ','F','เม.ย.',0,0,null,1613.56,196.77,3306.35,1377.09],
  ['BIGCราชดำริ','F','พ.ค.',0,0,null,1011.55,167.26,2875.09,1377.09],
  ['BIGCราชดำริ','F','พ.ค.',51590,38692.5,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','มิ.ย.',54669,41001.75,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','ม.ค.',3040,2280,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','ก.พ.',62945,47208.75,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','ก.พ.',54975,41231.25,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','มี.ค.',53535,40151.25,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','มี.ค.',60604,45453,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','เม.ย.',63499,47624.25,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','เม.ย.',53245,39933.75,0.25,0,0,0,0],
+ ['BIGCราชดำริ','F','ก.พ.',0,0,null,804.09,226.29,3349.7,1377.09],
+ ['BIGCราชดำริ','F','มี.ค.',0,0,null,1307.54,255.8,2651.85,1377.09],
  ['FashionIsland','E','ม.ค.',119515,83660.5,0.3,0,0,0,0],
  ['FashionIsland','E','ก.พ.',120690,84482.99,0.3,0,0,0,0],
  ['FashionIsland','E','มี.ค.',115399,80779.3,0.3,0,0,0,0],
@@ -379,6 +404,9 @@ const R=[
  ['แมคโครศรีนครินทร์','L','ก.ค.',0,6902.08,null,0,0,0,0],
  ['แมคโครศรีนครินทร์','L','ก.พ.',41426,0,null,0,0,0,0],
  ['แมคโครศรีนครินทร์','L','ก.พ.',44826,0,null,0,0,0,0],
+ ['โรบินสันลาดกระบัง','J','มิ.ย.',62746,47059.5,0.25,0,0,0,0],
+ ['ทรูดิจิทัลปาร์ค','C','มิ.ย.',110455,82841.25,0.25,0,0,0,0],
+ ['ทรูดิจิทัลปาร์ค','C','มิ.ย.',0,0,null,1939.91,211.86,1463.76,0],
 ];
 const F=r=>({b:r[0],t:r[1],mo:r[2],sale:r[3],bill:r[4],gp:r[5],ele:r[6],wat:r[7],gas:r[8],oth:r[9]});
 const ROWS=R.map(F);
@@ -436,6 +464,47 @@ function renderOverview(){
 monthSel.insertAdjacentHTML('beforeend','<option value="ALL">ทั้งปี 2026 (รวมทุกเดือน)</option>');
 monthsPresent.forEach(m=>monthSel.insertAdjacentHTML('beforeend',`<option value="${m}">ภาพรวม (รายเดือน) — ${m} 2569</option>`));
 monthSel.onchange=renderOverview; renderOverview();
+
+// ── yearly monthly sales trend (independent ของ month filter — ดูทั้งปีเสมอ) ──
+const PAL=['#3b82f6','#8b5cf6','#10b981','#f59e0b','#f43f5e','#06b6d4','#6366f1','#ec4899','#14b8a6','#f97316','#84cc16','#a855f7','#0ea5e9','#ef4444','#22c55e','#eab308','#d946ef','#475569'];
+let CT,trendMode='total';
+const monthlyFor=b=>monthsPresent.map(mo=>ROWS.filter(r=>r.b===b&&r.mo===mo).reduce((a,r)=>a+r.sale,0));
+const monthlyTotal=()=>monthsPresent.map(mo=>ROWS.filter(r=>r.mo===mo).reduce((a,r)=>a+r.sale,0));
+function renderTrend(){
+  if(CT)CT.destroy();
+  const labels=monthsPresent.map(m=>m+' 2569');
+  let datasets,legend;
+  if(trendMode==='total'){
+    const d=monthlyTotal(),mx=Math.max(...d),mn=Math.min(...d),iMx=d.indexOf(mx),iMn=d.indexOf(mn);
+    // biggest MoM rise / drop
+    let bestUp={v:-Infinity,i:0},bestDn={v:Infinity,i:0};
+    for(let i=1;i<d.length;i++){const dv=d[i]-d[i-1];if(dv>bestUp.v)bestUp={v:dv,i};if(dv<bestDn.v)bestDn={v:dv,i};}
+    datasets=[{label:'ยอดขายจริงรวม',data:d,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.12)',
+      fill:true,tension:.35,borderWidth:3,pointRadius:d.map(v=>v===mx||v===mn?6:4),
+      pointBackgroundColor:d.map(v=>v===mx?'#10b981':v===mn?'#f43f5e':'#3b82f6'),
+      pointBorderColor:'#fff',pointBorderWidth:2}];
+    legend={display:false};
+    trendNote.innerHTML=`<span style="color:#10b981;font-weight:700">▲ สูงสุด ${monthsPresent[iMx]}</span> ฿${fmt(mx)} · `+
+      `<span style="color:#f43f5e;font-weight:700">▼ ต่ำสุด ${monthsPresent[iMn]}</span> ฿${fmt(mn)} · `+
+      `ขาขึ้นแรงสุด ${monthsPresent[bestUp.i-1]}→${monthsPresent[bestUp.i]} (+฿${fmt(bestUp.v)}) · `+
+      `ขาลงแรงสุด ${monthsPresent[bestDn.i-1]}→${monthsPresent[bestDn.i]} (฿${fmt(bestDn.v)})`;
+  }else{
+    datasets=BRANCHES.map((b,i)=>({label:b,data:monthlyFor(b),borderColor:PAL[i%PAL.length],
+      backgroundColor:PAL[i%PAL.length],fill:false,tension:.3,borderWidth:2,pointRadius:2.5,pointHoverRadius:5}));
+    legend={position:'bottom',labels:{color:'#334155',font:{size:10},usePointStyle:true,pointStyle:'circle',padding:8,boxWidth:8}};
+    trendNote.innerHTML='แต่ละเส้น = 1 สาขา · คลิกชื่อสาขาด้านล่างเพื่อซ่อน/แสดงเส้น';
+  }
+  CT=new Chart(ct,{type:'line',data:{labels,datasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend,tooltip:{callbacks:{label:c=>c.dataset.label+': ฿'+fmt(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{color:tickC,font:{size:11}}},
+        y:{grid:{color:gridC},ticks:{color:tickC,font:{size:10},callback:v=>'฿'+Math.round(v/1000)+'k'}}}}});
+}
+document.querySelectorAll('#trendToggle button').forEach(btn=>btn.onclick=()=>{
+  document.querySelectorAll('#trendToggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');trendMode=btn.dataset.m;renderTrend();
+});
+renderTrend();
 
 // ── nav ──
 document.querySelectorAll('.nav button').forEach(btn=>btn.onclick=()=>{
