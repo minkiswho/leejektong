@@ -296,7 +296,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
     var expense = parseNum(card.querySelector('[data-f="expense"]').value);
     var deduct  = parseNum(card.querySelector('[data-f="deduct"]').value);
     var e = curEmployees[i];
-    var net = e.salary - expense - e.amount_prepaid - deduct;
+    var base = (curRound === 'mid') ? e.salary/2 : e.salary; // mid = ครึ่งเดือน
+    var net = base - expense - e.amount_prepaid - deduct;
     e.amount_expense = expense;
     e.amount_deduct = deduct;
     e.amount_net = net;
@@ -402,17 +403,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
     document.getElementById(target).innerHTML = '<div class="spinner"></div>';
     callGAS('getPayrollAdminQueue').then(function(res){
       if (!res.ok){ showMsg(res.message||res.error); return; }
-      renderAdmin(res.queue, target);
+      renderAdmin(res.queue, target, res.pending);
     });
   }
 
-  function renderAdmin(queue, target){
+  function renderAdmin(queue, target, pending){
     target = target || 'app';
+    var h = '';
+
+    // ── ค้างกรอกบัญชี (เตือน) ──
+    if (pending && pending.length){
+      h += '<div class="banner warn"><span class="ic">⏳</span><div><b>ยังไม่กรอกบัญชี '+pending.length+' คน</b> (รอพนักงานส่ง)</div></div>';
+      h += '<div class="card"><div class="sect-lbl">รอพนักงานกรอกบัญชี</div>';
+      for (var p=0;p<pending.length;p++){
+        h += '<div class="line"><span class="k">'+esc(pending[p].name)+' · '+esc(pending[p].branch_name)+'</span>'
+          + '<span class="v" style="color:var(--warn)">'+fmt(pending[p].amount_net)+'</span></div>';
+      }
+      h += '</div>';
+    }
+
     if (!queue || queue.length === 0){
-      document.getElementById(target).innerHTML = '<div class="banner ok"><span class="ic">✅</span><div>ไม่มีรายการรอโอน</div></div>';
+      h += '<div class="banner ok"><span class="ic">✅</span><div>ไม่มีรายการรอโอน</div></div>';
+      document.getElementById(target).innerHTML = h;
       return;
     }
-    var h = '<div class="banner info"><span class="ic">💸</span><div>ก๊อปเลขบัญชีไปโอน แล้วแนบสลิป</div></div>';
+    h += '<div class="banner info"><span class="ic">💸</span><div>ก๊อปเลขบัญชีไปโอน แล้วแนบสลิป</div></div>';
     for (var i=0;i<queue.length;i++){
       var q = queue[i];
       h += '<div class="card" data-pid="'+esc(q.payroll_id)+'">';
