@@ -395,58 +395,43 @@
     return d.getDate() + '/' + (d.getMonth() + 1) + '/' + (d.getFullYear() + 543);
   }
 
-  // ── CATEGORY MAP ──────────────────────────────────
-  // จาก SUPPLY_LIST 59 รายการ จัด group ตาม item_id
-  var categories = [
-    {
-      id: 'meat',
-      icon: '🥩',
-      title: 'เนื้อสัตว์ & อาหารทะเล',
-      ids: [1,2,3,4,5,6,7,8,9,11,12,21,47]
-      // หมูแดง, หมูกรอบ, กระดูกหมู, หมูบะช่อต้ม, เซ่งจี๊, ตับ, กระเพาะหมู,
-      // หัวใจ, เลือดหมู, ไข่ต้ม, เนื้อไก่, หมูสับ, หมูบะเต็ง
-    },
-    {
-      id: 'veg',
-      icon: '🥬',
-      title: 'ผัก & เครื่องปรุงสด',
-      ids: [10,14,15,16,23,24,29,45,46]
-      // ผักซุป, ผักกวางตุ้ง, หมูบะช่อสด, ผักจิงจูเกาเหลา, ผักโรยอาหาร,
-      // พริกชี้ฟ้าแดง, ใบเตย, กระเทียมเจียว, ผักชี(หน้าไก่)
-    },
-    {
-      id: 'sauce',
-      icon: '🍶',
-      title: 'น้ำซุป น้ำราด & น้ำจิ้ม',
-      ids: [13,17,18,19,20,25,26,27,28,31,39,40]
-      // น้ำราดข้าวหน้าไก่, น้ำราดข้าวหมูกรอบ, น้ำจิ้มข้าวหมูกรอบ,
-      // น้ำจิ้มซีฟู้ด, น้ำซุปบ๊วย, เครื่องปรุงซุป, กระดูกเล้ง,
-      // พริกไทยซุป, พริกน้ำส้ม, หนังสติ๊ก, น้ำจิ้มบ๊วย, น้ำจิ้มหวานหมูกรอบ
-    },
-    {
-      id: 'dry',
-      icon: '🧂',
-      title: 'ของแห้ง & เครื่องปรุง',
-      ids: [22,32,33,34,36,37,38,41,42,53]
-      // แผ่นเกี๊ยว, เส้นก๋วยจั๊บ, ข้าวสาร, เกลือ,
-      // พริกป่น, น้ำตาล, พริกไทยป่น, เครื่องปรุงกลับบ้าน, น้ำมัน, น้ำปลา
-    },
-    {
-      id: 'pack',
-      icon: '📦',
-      title: 'บรรจุภัณฑ์ & ถุง',
-      ids: [30,43,44,49,50]
-      // ถุงน้ำซุป, กล่องข้าว(แดง), กล่องเกี๊ยวทอด, ถุงหิ้ว 8x16, ถุงน้ำจิ้ม 3x5
-    },
-    {
-      id: 'supply',
-      icon: '🧴',
-      title: 'ของใช้ & ทำความสะอาด',
-      ids: [35,48,51,52,54,55,56,57,58,59]
-      // ถุงมือ, น้ำยาล้างจาน, ฝอยขัดหม้อ, สก๊อตไบร์ท,
-      // ที่คีบอาหาร, ถุงขยะ, น้ำยาเช็ดกระจก, แกลลอนเปล่า, ผ้าเช็ดกระจก, ผงซักฟอก
+  // ── CATEGORY / GROUP ──────────────────────────────
+  // 🔴 v14: เลิก hardcode item_id แล้ว — หมวดมาจากคอลัมน์ `group` ใน SUPPLY_LIST
+  //   • เพิ่มของใหม่ในชีต → ขึ้นในแอปเอง ไม่ต้องแก้โค้ด
+  //   • เพิ่มหมวดใหม่ = พิมพ์ชื่อหมวดใหม่ในคอลัมน์ group → แอปสร้าง section ให้เอง
+  //   • ลำดับหมวด = ลำดับที่เจอครั้งแรกในชีต (อยากสลับหมวด → ย้ายแถวในชีต)
+  //   • ของที่ไม่ได้ใส่ group → ตกไปหมวด "อื่นๆ" ท้ายสุด (ไม่หายเงียบเหมือนเวอร์ชันเก่า)
+  var FALLBACK_GROUP = '📌 อื่นๆ (ยังไม่จัดหมวด)';
+
+  // จัดกลุ่ม items ตามคอลัมน์ group โดยคงลำดับที่เจอในชีต
+  function buildGroups(items) {
+    var seq = [], map = {};
+    items.forEach(function(it) {
+      var g = String(it.group || '').trim() || FALLBACK_GROUP;
+      if (!map[g]) { map[g] = []; seq.push(g); }
+      map[g].push(it);
+    });
+    // ดันหมวด "อื่นๆ" ไปท้ายสุดเสมอ ไม่ว่าจะเจอตอนไหน
+    var i = seq.indexOf(FALLBACK_GROUP);
+    if (i > -1) { seq.splice(i, 1); seq.push(FALLBACK_GROUP); }
+    return seq.map(function(g) { return { title: g, items: map[g] }; });
+  }
+
+  // แยก emoji นำหน้าออกมาเป็นไอคอน เช่น "🥩 เนื้อสัตว์" → icon 🥩 + title เนื้อสัตว์
+  // ถ้าไม่มี emoji นำหน้า ก็โชว์ชื่อเฉยๆ ไม่พัง
+  function splitIcon(name) {
+    var m = String(name).match(/^(\S+)\s+(.+)$/);
+    if (m && !/[A-Za-z0-9฀-๿]/.test(m[1])) {
+      return { icon: m[1], title: m[2] };
     }
-  ];
+    return { icon: '', title: String(name) };
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
+  }
 
   // ── HELPERS ──────────────────────────────────────
   function el(id) { return document.getElementById(id); }
@@ -486,26 +471,21 @@
   // ── RENDER ITEMS ────────────────────────────────
   function renderItems(items) {
     allItems = items;
-    // index by id
-    var itemMap = {};
-    items.forEach(function(it){ itemMap[it.item_id] = it; });
 
     var container = el('itemList');
     container.innerHTML = '';
 
-    categories.forEach(function(cat) {
-      // filter items ที่มีใน list จริง (GAS เป็น source of truth)
-      var catItems = cat.ids
-        .map(function(id){ return itemMap[id]; })
-        .filter(Boolean);
-      if (!catItems.length) return;
+    // 🔴 v14: กลุ่มมาจากชีต ไม่ใช่ hardcode — ทุก item ใน SUPPLY_LIST ได้ขึ้นจอเสมอ
+    buildGroups(items).forEach(function(cat) {
+      var catItems = cat.items;
+      var head = splitIcon(cat.title);
 
       var section = document.createElement('div');
       section.className = 'category-section';
       section.innerHTML =
         '<div class="category-header">' +
-          '<span class="cat-icon">' + cat.icon + '</span>' +
-          '<span class="cat-title">' + cat.title + '</span>' +
+          '<span class="cat-icon">' + esc(head.icon) + '</span>' +
+          '<span class="cat-title">' + esc(head.title) + '</span>' +
           '<span class="cat-count">' + catItems.length + ' รายการ</span>' +
         '</div>';
 
@@ -516,7 +496,7 @@
         row.className = 'item-row';
         row.id = 'row-' + id;
         row.innerHTML =
-          '<span class="item-name">' + item.item_name + '</span>' +
+          '<span class="item-name">' + esc(item.item_name) + '</span>' +
           '<div class="qty-ctrl">' +
             '<button class="qty-btn minus" data-id="' + id + '" onclick="changeQty(' + id + ',-1)">−</button>' +
             '<span class="qty-num" id="qty-' + id + '">0</span>' +

@@ -104,8 +104,9 @@
       font-size: 13px; font-weight: 800;
       padding: 4px 12px; border-radius: 8px;
     }
-    .dept-tag.kitchen { background: #FDECEA; color: var(--brand); }
-    .dept-tag.dry     { background: #EAF2FB; color: #1F5C99; }
+    .dept-tag.kitchen  { background: #FDECEA; color: var(--brand); }
+    .dept-tag.dry      { background: #EAF2FB; color: #1F5C99; }
+    .dept-tag.darksoup { background: #F3ECFB; color: #6B3FA0; }   /* 🔴 v14 ก๋วยจั๊บน้ำข้น */
     .branch-name { font-size: 15px; font-weight: 800; flex: 1; min-width: 0; }
     .deliver-tag {
       font-size: 12px; font-weight: 700;
@@ -246,6 +247,13 @@
     });
   }
 
+  // 🔴 v14: แปลง category → class ป้ายแผนก (whitelist กัน class แปลกปลอม)
+  // แผนกใหม่ที่ backend ยังไม่รู้จัก → ใช้สีของแห้งเป็น fallback (ป้ายยังโชว์ชื่อถูก)
+  function deptClass(cat) {
+    var allowed = { kitchen: 1, dry: 1, darksoup: 1 };
+    return allowed[cat] ? cat : 'dry';
+  }
+
   // ── DENY (ไม่มีสิทธิ์) ──
   function showDeny() {
     el('loadingWrap').style.display = 'none';
@@ -287,7 +295,7 @@
         '<div class="order-card" id="card-' + esc(o.order_id) + '">' +
           '<div class="order-head">' +
             '<div class="dept-row">' +
-              '<span class="dept-tag ' + (o.category === 'kitchen' ? 'kitchen' : 'dry') + '">' +
+              '<span class="dept-tag ' + deptClass(o.category) + '">' +
                 esc(o.dept_icon) + ' ' + esc(o.dept_label) +
               '</span>' +
             '</div>' +
