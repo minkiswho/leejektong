@@ -767,11 +767,14 @@
       if (Number(emp.branch_id) === 15 || emp.role === 'super_admin') {
         document.getElementById('btnPick').style.display = 'flex';
       }
-      // โชว์ปุ่มตรวจสาขา + ดูผลตรวจ เฉพาะ super_admin / manager
-      if (emp.role === 'super_admin' || emp.role === 'manager') {
-        document.getElementById('btnInspect').style.display = 'flex';
-        document.getElementById('btnInspectView').style.display = 'flex';
-      }
+      // v16: ปุ่มตรวจสาขา / ดูผลตรวจ — สิทธิ์มาจาก backend (inspect_do / inspect_view ในชีต EMPLOYEES)
+      // แยก 2 ปุ่ม เพราะให้ดูผลอย่างเดียวโดยไม่ให้ตรวจได้
+      // ถ้า backend ยังเป็นตัวเก่าที่ไม่ส่ง can_* มา → ตกกลับไปใช้กฎ role เดิม (ไม่พังหน้าแรก)
+      var _roleFallback = (emp.role === 'super_admin' || emp.role === 'manager');
+      var _canDo   = (emp.can_inspect_do   === undefined) ? _roleFallback : emp.can_inspect_do;
+      var _canView = (emp.can_inspect_view === undefined) ? _roleFallback : emp.can_inspect_view;
+      if (_canDo)   document.getElementById('btnInspect').style.display = 'flex';
+      if (_canView) document.getElementById('btnInspectView').style.display = 'flex';
       // โหลดวันหยุดของฉันมาโชว์บนสุด
       loadMyLeaves();
       // v14: โหลดการเตือน (ขาดส่งยอด / ไม่เช็คอิน) — แยก request ไม่บล็อกหน้าแรก
