@@ -10,6 +10,7 @@
     --green:#06c755; --green-dark:#05a948;
     --ink:#1c1c1e; --muted:#8a8a8e; --line:#e3e3e6;
     --bg:#f5f5f7; --card:#ffffff; --red:#d92d20; --amber:#b54708;
+    --blue:#1f5c99;
   }
   *{box-sizing:border-box}
   body{
@@ -38,24 +39,45 @@
   textarea{resize:none;min-height:64px}
   .hint{font-size:12px;color:var(--muted);margin-top:7px}
 
-  /* checklist */
+  /* ===== checklist ===== */
   .checkhead{font-size:14px;font-weight:600;margin-bottom:4px}
-  .checkitem{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:14px 0;border-bottom:1px solid var(--line);
-  }
-  .checkitem:last-child{border-bottom:0}
-  .citem-label{font-size:15px;flex:1;padding-right:12px}
-  /* toggle ผ่าน/ไม่ผ่าน */
+  .citem{padding:14px 0;border-bottom:1px solid var(--line)}
+  .citem:last-child{border-bottom:0}
+  .citem-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .citem-txt{flex:1;min-width:0}
+  .citem-label{font-size:15px;font-weight:600;line-height:1.35}
+  .citem-no{color:var(--muted);font-weight:400;margin-right:5px}
+  .citem-crit{font-size:12px;color:var(--muted);line-height:1.45;margin-top:4px}
   .toggle{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex-shrink:0}
   .toggle button{
     border:0;background:#fff;color:var(--muted);
     font-size:13px;font-weight:600;font-family:inherit;
-    padding:8px 14px;cursor:pointer;transition:all .12s;
+    padding:8px 13px;cursor:pointer;transition:all .12s;
   }
   .toggle button.pass.active{background:var(--green);color:#fff}
   .toggle button.fail.active{background:var(--red);color:#fff}
   .toggle button:first-child{border-right:1px solid var(--line)}
+
+  /* ===== photo ===== */
+  .photobox{margin-top:12px;padding:12px;background:#fafafb;border:1px dashed var(--line);border-radius:10px}
+  .photobox.need{border-color:#f3b7b0;background:#fef7f6}
+  .photobox.done{border-color:#b6e6c4;background:#f4fbf6;border-style:solid}
+  .photolab{font-size:12px;font-weight:600;color:var(--amber);margin-bottom:9px}
+  .photobox.done .photolab{color:var(--green-dark)}
+  .thumbs{display:flex;flex-wrap:wrap;gap:8px}
+  .thumb{position:relative;width:70px;height:70px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#fff}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .x{
+    position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;
+    background:rgba(0,0,0,.6);color:#fff;border:0;font-size:13px;line-height:20px;
+    padding:0;cursor:pointer;font-family:inherit;
+  }
+  .addbtn{
+    width:70px;height:70px;border-radius:8px;border:1px dashed #c3c3c8;background:#fff;
+    color:var(--muted);font-size:24px;font-family:inherit;cursor:pointer;line-height:1;
+  }
+  .addbtn:disabled{opacity:.4;cursor:default}
+  .hidden{display:none}
 
   button.submit{
     width:100%;font-size:17px;font-weight:700;color:#fff;
@@ -64,6 +86,7 @@
   }
   button.submit:active{background:var(--green-dark)}
   button.submit:disabled{background:#c7c7cc;cursor:default}
+
   .msg{
     display:none;font-size:14px;line-height:1.5;
     border-radius:10px;padding:12px 14px;margin-bottom:14px;white-space:pre-line;
@@ -72,6 +95,11 @@
   .msg.ok{background:#e7f7ec;color:var(--green-dark);border:1px solid #b6e6c4}
   .msg.warn{background:#fff4e5;color:var(--amber);border:1px solid #f5d6a8}
   .msg.err{background:#fdecea;color:var(--red);border:1px solid #f5c2bd}
+  .msg.info{background:#eef4fb;color:var(--blue);border:1px solid #c9dcf0}
+
+  .bar{height:6px;border-radius:3px;background:#e3e3e6;overflow:hidden;margin-top:9px}
+  .bar > i{display:block;height:100%;width:0;background:var(--green);transition:width .25s}
+
   .loading{text-align:center;color:var(--muted);font-size:14px;padding:40px 0}
   .who{font-size:13px;color:var(--muted);margin-bottom:16px}
   .who b{color:var(--ink);font-weight:600}
@@ -97,13 +125,13 @@
     </div>
 
     <div class="card">
-      <div class="checkhead">รายการตรวจ 7 ข้อ</div>
-      <p class="hint" style="margin-top:0;margin-bottom:6px">แตะ ผ่าน / ไม่ผ่าน ในแต่ละข้อ (เริ่มต้น = ผ่าน)</p>
+      <div class="checkhead" id="checkHead">รายการตรวจ</div>
+      <p class="hint" style="margin-top:0;margin-bottom:6px">แตะ ผ่าน / ไม่ผ่าน ในแต่ละข้อ (เริ่มต้น = ผ่าน) · ข้อที่มีกรอบสีต้องแนบรูป</p>
       <div id="checklist"></div>
     </div>
 
     <div class="card">
-      <label for="note">หมายเหตุ (ถ้ามี)</label>
+      <label for="note">สรุปผลการตรวจ / ข้อเสนอแนะ</label>
       <textarea id="note" placeholder="เว้นว่างได้"></textarea>
     </div>
 
@@ -117,40 +145,33 @@ var LIFF_ID = "2010362712-uGq1XJQ6";
 var GAS_URL = "https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec";
 var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
 
-// checklist 7 ข้อ — key ต้องตรงกับ INSPECT_ITEMS ใน Inspect.gs เป๊ะ
-var ITEMS = [
-  { key: "porkcrisp",   label: "ความกรอบหมูกรอบ" },
-  { key: "soup",        label: "น้ำซุป" },
-  { key: "offal",       label: "เครื่องใน" },
-  { key: "storage",     label: "การจัดเก็บวัตถุดิบ" },
-  { key: "cleanliness", label: "ความสะอาดของสาขา" },
-  { key: "service",     label: "การบริการของพนักงาน" },
-  { key: "foodprep",    label: "การจัดเตรียมอาหารของพนักงาน" }
-];
+var MAX_PHOTO_PER_ITEM = 3;
+var IMG_MAX_PX = 1280;      // ขอบยาวสุดหลังบีบ
+var IMG_QUALITY = 0.8;      // jpeg quality (เท่ากับ payroll.html)
 
-var uid = null;
-var emp = null;
-var state = {};   // key → true(ผ่าน)/false(ไม่ผ่าน)
+// ===== STATE =====
+var USER_ID = "";
+var ITEMS = [];             // [{item_key,label,criteria,require_photo}]
+var RESULTS = {};           // item_key -> true/false
+var PHOTOS = {};            // item_key -> [dataUrl,...]
+var SUBMITTED = false;      // กันกดส่งซ้ำหลังบันทึกใบสำเร็จ
 
-// ===== helpers =====
 function $(id){ return document.getElementById(id); }
-function showMsg(type, text){
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function show(kind, text){
   var m = $("msg");
-  m.className = "msg show " + type;
-  m.innerText = text;
+  m.className = "msg show " + kind;
+  m.textContent = text;
 }
 function hideMsg(){ $("msg").className = "msg"; }
 
-function thaiDate(){
-  var d = new Date();
-  var dd = ("0"+d.getDate()).slice(-2);
-  var mm = ("0"+(d.getMonth()+1)).slice(-2);
-  var yy = d.getFullYear() + 543;
-  return dd + "/" + mm + "/" + yy;
-}
-
-// POST text/plain กัน CORS preflight (ตาม decision ที่ lock)
-function post(payload){
+function call(payload){
+  payload.token = SHARED_SECRET;
+  payload.userId = USER_ID;
   return fetch(GAS_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -158,130 +179,294 @@ function post(payload){
   }).then(function(r){ return r.json(); });
 }
 
-// ===== สร้าง checklist UI =====
-function buildChecklist(){
-  var box = $("checklist");
-  var html = "";
-  ITEMS.forEach(function(it){
-    state[it.key] = true;   // default = ผ่าน
-    html +=
-      '<div class="checkitem">' +
-        '<div class="citem-label">' + it.label + '</div>' +
-        '<div class="toggle" data-key="' + it.key + '">' +
-          '<button type="button" class="pass active" onclick="setPass(\'' + it.key + '\',true,this)">ผ่าน</button>' +
-          '<button type="button" class="fail" onclick="setPass(\'' + it.key + '\',false,this)">ไม่ผ่าน</button>' +
-        '</div>' +
-      '</div>';
+// ===== BOOT =====
+function init(){
+  var d = new Date();
+  $("dateLabel").textContent = "วันที่ " + d.getDate() + "/" + (d.getMonth()+1) + "/" + (d.getFullYear()+543);
+
+  liff.init({ liffId: LIFF_ID }).then(function(){
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return new Promise(function(){}); }
+    return liff.getProfile();
+  }).then(function(prof){
+    if (!prof) return;
+    USER_ID = prof.userId;
+    return Promise.all([
+      call({ action: "getProfile" }),
+      call({ action: "getBranches" }),
+      call({ action: "getInspectItems" })
+    ]);
+  }).then(function(arr){
+    if (!arr) return;
+    var profRes = arr[0], brRes = arr[1], itRes = arr[2];
+
+    if (!profRes || !profRes.ok) {
+      $("boot").textContent = "ไม่พบข้อมูลพนักงาน ติดต่อแอดมิน";
+      return;
+    }
+    if (itRes && itRes.error === "FORBIDDEN") {
+      $("boot").textContent = "หน้านี้สำหรับผู้ที่ได้รับสิทธิ์ตรวจสาขาเท่านั้น";
+      return;
+    }
+    if (!itRes || !itRes.ok || !itRes.items || !itRes.items.length) {
+      $("boot").textContent = (itRes && itRes.message) || "ยังไม่ได้ตั้งหัวข้อตรวจ";
+      return;
+    }
+
+    var emp = profRes.employee || {};
+    $("who").innerHTML = "ผู้ตรวจ: <b>" + esc(emp.name || "") + "</b>";
+
+    // สาขา
+    var sel = $("branch");
+    ((brRes && brRes.branches) || []).forEach(function(b){
+      var o = document.createElement("option");
+      o.value = b.branch_id;
+      o.textContent = b.branch_name;
+      sel.appendChild(o);
+    });
+
+    ITEMS = itRes.items;
+    renderChecklist();
+
+    $("boot").style.display = "none";
+    $("form").style.display = "block";
+  }).catch(function(e){
+    $("boot").textContent = "เปิดผ่านเมนูใน LINE เท่านั้น";
   });
+}
+
+// ===== CHECKLIST =====
+function renderChecklist(){
+  $("checkHead").textContent = "รายการตรวจ " + ITEMS.length + " ข้อ";
+
+  var html = "";
+  ITEMS.forEach(function(it, i){
+    RESULTS[it.item_key] = true;              // default ผ่าน
+    if (it.require_photo) PHOTOS[it.item_key] = [];
+
+    html += '<div class="citem">'
+      + '<div class="citem-top">'
+        + '<div class="citem-txt">'
+          + '<div class="citem-label"><span class="citem-no">' + (i+1) + '.</span>' + esc(it.label) + '</div>'
+          + (it.criteria ? '<div class="citem-crit">' + esc(it.criteria) + '</div>' : '')
+        + '</div>'
+        + '<div class="toggle">'
+          + '<button type="button" class="pass active" id="p_' + i + '" onclick="setRes(' + i + ',true)">ผ่าน</button>'
+          + '<button type="button" class="fail" id="f_' + i + '" onclick="setRes(' + i + ',false)">ไม่ผ่าน</button>'
+        + '</div>'
+      + '</div>';
+
+    if (it.require_photo) {
+      html += '<div class="photobox need" id="pb_' + i + '">'
+        + '<div class="photolab" id="pl_' + i + '">📷 ต้องแนบรูป (0/' + MAX_PHOTO_PER_ITEM + ')</div>'
+        + '<div class="thumbs" id="th_' + i + '"></div>'
+        + '<input type="file" accept="image/*" capture="environment" class="hidden" id="fi_' + i + '" onchange="pickPhoto(' + i + ',this)">'
+      + '</div>';
+    }
+    html += '</div>';
+  });
+  $("checklist").innerHTML = html;
+
+  ITEMS.forEach(function(it, i){ if (it.require_photo) renderThumbs(i); });
+}
+
+function setRes(i, pass){
+  if (SUBMITTED) return;
+  var key = ITEMS[i].item_key;
+  RESULTS[key] = pass;
+  $("p_" + i).className = "pass" + (pass ? " active" : "");
+  $("f_" + i).className = "fail" + (pass ? "" : " active");
+}
+
+// ===== PHOTO =====
+function renderThumbs(i){
+  var key = ITEMS[i].item_key;
+  var arr = PHOTOS[key] || [];
+  var box = $("th_" + i);
+  var html = "";
+
+  arr.forEach(function(d, k){
+    html += '<div class="thumb"><img src="' + d + '">'
+          + (SUBMITTED ? '' : '<button type="button" class="x" onclick="delPhoto(' + i + ',' + k + ')">×</button>')
+          + '</div>';
+  });
+  if (arr.length < MAX_PHOTO_PER_ITEM && !SUBMITTED) {
+    html += '<button type="button" class="addbtn" id="ab_' + i + '" onclick="document.getElementById(\'fi_' + i + '\').click()">+</button>';
+  }
   box.innerHTML = html;
-}
-function setPass(key, val, btnEl){
-  state[key] = val;
-  var grp = btnEl.parentNode;
-  var btns = grp.querySelectorAll("button");
-  btns[0].classList.toggle("active", val === true);   // ผ่าน
-  btns[1].classList.toggle("active", val === false);  // ไม่ผ่าน
+
+  var done = arr.length > 0;
+  $("pb_" + i).className = "photobox " + (done ? "done" : "need");
+  $("pl_" + i).textContent = (done ? "📷 แนบแล้ว (" : "📷 ต้องแนบรูป (")
+                           + arr.length + "/" + MAX_PHOTO_PER_ITEM + ")";
 }
 
-// ===== boot =====
-$("dateLabel").innerText = "วันที่ " + thaiDate();
+function pickPhoto(i, input){
+  var file = input.files && input.files[0];
+  input.value = "";                       // เคลียร์ให้เลือกรูปเดิมซ้ำได้
+  if (!file) return;
 
-liff.init({ liffId: LIFF_ID }).then(function(){
-  if(!liff.isLoggedIn()){
-    liff.login({ redirectUri: location.href });
-    return new Promise(function(){});
-  }
-  return liff.getProfile();
-}).then(function(p){
-  if(!p) return;
-  uid = p.userId;
-  return post({ token: SHARED_SECRET, userId: uid, action: "getProfile" });
-}).then(function(res){
-  if(!res.ok){
-    $("boot").style.display = "none";
-    showMsg("err", res.error === "USER_NOT_FOUND"
-      ? "ไม่พบบัญชีพนักงานในระบบ ติดต่อแอดมิน"
-      : "เข้าระบบไม่สำเร็จ: " + (res.error || "unknown"));
-    return null;
-  }
-  emp = res.employee;
+  var key = ITEMS[i].item_key;
+  if (!PHOTOS[key]) PHOTOS[key] = [];
+  if (PHOTOS[key].length >= MAX_PHOTO_PER_ITEM) return;
 
-  // 🔒 guard ฝั่งหน้าจอ: เฉพาะ manager / super_admin
-  var role = String(emp.role || "").trim().toLowerCase();
-  if(role !== "manager" && role !== "super_admin"){
-    $("boot").style.display = "none";
-    showMsg("err", "หน้านี้สำหรับผู้จัดการและแอดมินเท่านั้น");
-    return null;
-  }
+  compress(file, function(dataUrl, err){
+    if (err) { show("err", "อ่านรูปไม่สำเร็จ ลองใหม่อีกครั้ง"); return; }
+    PHOTOS[key].push(dataUrl);
+    renderThumbs(i);
+    hideMsg();
+  });
+}
 
-  return post({ token: SHARED_SECRET, userId: uid, action: "getBranches" });
-}).then(function(res){
-  if(!res) return;
-  if(!res.ok){
-    $("boot").style.display = "none";
-    showMsg("err", "โหลดรายชื่อสาขาไม่สำเร็จ: " + (res.error || "unknown"));
+function delPhoto(i, k){
+  if (SUBMITTED) return;
+  var key = ITEMS[i].item_key;
+  PHOTOS[key].splice(k, 1);
+  renderThumbs(i);
+}
+
+// บีบรูปด้วย canvas ก่อนส่ง (pattern เดียวกับ payroll.html)
+function compress(file, cb){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var w = img.width, h = img.height;
+      if (w > h && w > IMG_MAX_PX)      { h = Math.round(h * IMG_MAX_PX / w); w = IMG_MAX_PX; }
+      else if (h >= w && h > IMG_MAX_PX){ w = Math.round(w * IMG_MAX_PX / h); h = IMG_MAX_PX; }
+      var cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      try { cb(cv.toDataURL("image/jpeg", IMG_QUALITY)); }
+      catch (err) { cb(null, err); }
+    };
+    img.onerror = function(){ cb(null, "img"); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function(){ cb(null, "reader"); };
+  reader.readAsDataURL(file);
+}
+
+// ===== SUBMIT =====
+function submitInspect(){
+  if (SUBMITTED) return;
+  hideMsg();
+
+  var branchId = $("branch").value;
+  if (!branchId) { show("warn", "กรุณาเลือกสาขาที่ตรวจ"); window.scrollTo(0,0); return; }
+
+  // เช็ครูปบังคับครบไหม
+  var missing = [];
+  ITEMS.forEach(function(it, i){
+    if (it.require_photo && (!PHOTOS[it.item_key] || !PHOTOS[it.item_key].length)) {
+      missing.push((i+1) + ". " + it.label);
+    }
+  });
+  if (missing.length) {
+    show("warn", "ยังไม่ได้แนบรูป " + missing.length + " ข้อ:\n" + missing.join("\n"));
     return;
   }
-  var sel = $("branch");
-  res.branches.forEach(function(b){
-    var o = document.createElement("option");
-    o.value = b.branch_id;
-    o.text = b.branch_name;
-    sel.appendChild(o);
-  });
-  // default = สาขาประจำตัวคนตรวจ (เปลี่ยนได้ทุกสาขา)
-  if(emp && emp.branch_id){ sel.value = String(emp.branch_id); }
-
-  buildChecklist();
-
-  $("who").innerHTML = "ผู้ตรวจ: <b>" + emp.name + "</b>";
-  $("boot").style.display = "none";
-  $("form").style.display = "block";
-}).catch(function(e){
-  $("boot").style.display = "none";
-  showMsg("err", "เกิดข้อผิดพลาด: " + (e && e.message ? e.message : e));
-});
-
-// ===== submit =====
-function submitInspect(){
-  hideMsg();
-  var branch_id = Number($("branch").value);
-  if(!branch_id){ showMsg("warn", "กรุณาเลือกสาขา"); return; }
-
-  // ประกอบผล checklist เป็น object { key: true/false }
-  var results = {};
-  ITEMS.forEach(function(it){ results[it.key] = (state[it.key] === true); });
 
   var btn = $("btn");
   btn.disabled = true;
-  btn.innerText = "กำลังส่ง...";
+  btn.textContent = "กำลังบันทึกใบตรวจ...";
+  show("info", "⏳ จังหวะ 1/2 — กำลังบันทึกใบตรวจ");
 
-  post({
-    token: SHARED_SECRET, userId: uid, action: "submitInspection",
-    branch_id: branch_id, results: results, note: $("note").value.trim()
+  // ---- จังหวะ 1: ข้อความล้วน ----
+  call({
+    action: "submitInspection",
+    branch_id: Number(branchId),
+    results: RESULTS,
+    note: $("note").value
   }).then(function(res){
-    if(res.ok){
-      showMsg("ok",
-        "✓ ส่งผลตรวจสำเร็จ\n" + res.branch_name +
-        "\nผ่าน " + res.pass_count + " ข้อ / ไม่ผ่าน " + res.fail_count + " ข้อ");
-      $("form").style.display = "none";
+    if (!res || !res.ok) {
+      btn.disabled = false;
+      btn.textContent = "ส่งผลตรวจ";
+      show("err", "บันทึกไม่สำเร็จ: " + ((res && (res.message || res.error)) || "ไม่ทราบสาเหตุ"));
       return;
     }
-    btn.disabled = false;
-    btn.innerText = "ส่งผลตรวจ";
-    if(res.error === "FORBIDDEN"){
-      showMsg("err", "ไม่มีสิทธิ์ส่งผลตรวจ (เฉพาะผู้จัดการ/แอดมิน)");
-    } else if(res.error === "BRANCH_NOT_FOUND"){
-      showMsg("err", "ไม่พบสาขาที่เลือก");
-    } else {
-      showMsg("err", "ส่งไม่สำเร็จ: " + (res.error || "unknown"));
+
+    SUBMITTED = true;                       // ล็อกฟอร์ม กันส่งซ้ำ
+    ITEMS.forEach(function(it, i){ if (it.require_photo) renderThumbs(i); });
+
+    var queue = buildQueue();
+    if (!queue.length) {
+      finish(res, 0, 0);
+      return;
     }
-  }).catch(function(e){
+    uploadAll(res, queue);
+  }).catch(function(){
     btn.disabled = false;
-    btn.innerText = "ส่งผลตรวจ";
-    showMsg("err", "เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง");
+    btn.textContent = "ส่งผลตรวจ";
+    show("err", "เชื่อมต่อไม่สำเร็จ ตรวจสอบสัญญาณแล้วลองใหม่\n(ใบตรวจยังไม่ถูกบันทึก)");
   });
 }
+
+function buildQueue(){
+  var q = [];
+  ITEMS.forEach(function(it){
+    (PHOTOS[it.item_key] || []).forEach(function(d){
+      q.push({ item_key: it.item_key, data: d });
+    });
+  });
+  return q;
+}
+
+// ---- จังหวะ 2: อัปรูปทีละรูป ----
+function uploadAll(res, queue){
+  var total = queue.length, done = 0, failed = 0;
+  var btn = $("btn");
+  btn.textContent = "กำลังอัปโหลดรูป...";
+
+  function paint(){
+    var m = $("msg");
+    m.className = "msg show info";
+    m.innerHTML = "⏳ จังหวะ 2/2 — กำลังอัปโหลดรูป " + (done + failed) + "/" + total
+                + '<div class="bar"><i style="width:' + Math.round((done+failed)/total*100) + '%"></i></div>';
+  }
+  paint();
+
+  function step(idx){
+    if (idx >= queue.length) { finish(res, done, failed); return; }
+    var job = queue[idx];
+    call({
+      action: "uploadInspectPhoto",
+      inspection_id: res.inspection_id,
+      item_key: job.item_key,
+      photo_base64: job.data,
+      photo_mime: "image/jpeg"
+    }).then(function(r){
+      if (r && r.ok) done++; else failed++;
+      paint();
+      step(idx + 1);
+    }).catch(function(){
+      failed++;
+      paint();
+      step(idx + 1);
+    });
+  }
+  step(0);
+}
+
+function finish(res, done, failed){
+  var btn = $("btn");
+  btn.textContent = "บันทึกเรียบร้อย";
+  btn.disabled = true;
+
+  var txt = "✅ บันทึกผลตรวจแล้ว\n"
+          + "สาขา: " + res.branch_name + "\n"
+          + "ผ่าน " + res.pass_count + " ข้อ · ไม่ผ่าน " + res.fail_count + " ข้อ";
+
+  if (done)   txt += "\n📷 อัปรูปสำเร็จ " + done + " รูป";
+  if (failed) {
+    txt += "\n⚠️ รูปอัปไม่สำเร็จ " + failed + " รูป — ใบตรวจบันทึกแล้ว ไม่ต้องตรวจใหม่";
+    show("warn", txt);
+  } else {
+    show("ok", txt);
+  }
+  window.scrollTo(0, 0);
+}
+
+init();
 </script>
 </body>
 </html>
