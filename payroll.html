@@ -56,6 +56,42 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
 .efield .tag{font-size:9px;background:var(--leave-bg);color:var(--leave);padding:2px 6px;
   border-radius:6px;font-weight:700;margin-left:4px}
 .efield .tag.auto{background:var(--surface-2);color:var(--sub)}
+/* ===== v18 ===== */
+.srch{width:100%;font-family:inherit;font-size:15px;padding:11px 13px;border:1.5px solid var(--border);
+  border-radius:12px;background:#fff;color:var(--text);margin-bottom:10px}
+.srch:focus{outline:none;border-color:var(--brand)}
+.per-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;color:var(--sub)}
+.per-bar b{color:var(--text)}
+.per-bar select{font-family:inherit;font-size:13px;padding:6px 8px;border:1.5px solid var(--border);
+  border-radius:9px;background:#fff;color:var(--text)}
+.selbar{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--sub);margin:2px 0 10px}
+.selbar button{background:none;border:0;font-family:inherit;font-size:13px;color:var(--leave);cursor:pointer;padding:2px 4px}
+.card.sel{border-color:var(--success);box-shadow:0 0 0 2px rgba(30,132,73,.12)}
+.rpick{display:flex;gap:6px;margin:2px 0 8px}
+.rpick button{flex:1;font-family:inherit;font-size:13px;font-weight:600;padding:8px 4px;border-radius:10px;
+  border:1.5px solid var(--border);background:#fff;color:var(--sub);cursor:pointer}
+.rpick button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.rng{font-size:11.5px;color:var(--sub);margin:-4px 0 8px}
+.efield input.need{border-color:var(--amber);background:#fffdf6}
+.exp-wrap{margin:-2px 0 6px}
+.exp-toggle{background:none;border:0;padding:3px 0;font-family:inherit;font-size:12px;color:var(--leave);cursor:pointer;display:block}
+.exp-list{display:none;background:var(--surface);border-radius:var(--radius-sm);padding:8px 10px;margin-top:4px}
+.exp-row{display:flex;gap:8px;align-items:baseline;font-size:12px;padding:4px 0;color:var(--sub)}
+.exp-row .d{flex-shrink:0;width:62px}
+.exp-row .r{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-row .a{flex-shrink:0;font-weight:600;color:var(--text)}
+.exp-row.sum{border-top:1px solid var(--border);margin-top:3px;padding-top:6px;font-weight:700;color:var(--text)}
+.exp-none{font-size:12px;color:var(--sub);padding:2px 0 6px}
+.hrow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+.hrow:last-child{border-bottom:0}
+.hrow .l .n{font-size:15px;font-weight:700}
+.hrow .l .s{font-size:12px;color:var(--sub);margin-top:2px}
+.hrow .r{text-align:right;flex-shrink:0}
+.hrow .r .a{font-size:16px;font-weight:800;color:var(--success)}
+.hrow .r .d{font-size:11.5px;color:var(--sub);margin-top:2px}
+.pill{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:12px;margin-right:4px}
+.pill.wait{background:#FFF4E5;color:var(--amber)}
+.pill.go{background:#EEF3F9;color:var(--leave)}
 
 .form-grp{margin:10px 0}
 .form-grp label{display:block;font-size:12px;font-weight:600;color:var(--sub);margin-bottom:5px}
@@ -134,7 +170,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
   }
 
   function fmt(n){ return Number(n||0).toLocaleString('th-TH'); }
-  function roundName(r){ return r==='mid'?'รอบกลางเดือน':(r==='b15'?'รอบร้านหลัก':'รอบสิ้นเดือน'); }
+  function roundName(r){ return r==='mid'?'รอบกลางเดือน':(r==='b15'?'รอบร้านหลัก':'รอบปลายเดือน'); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
   function toast(msg){
@@ -173,158 +209,359 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
   // ============ ROUTER ตาม role ============
   function route(){
     var role = myEmp.role;
-    if (role === 'super_admin') { adminShell(); }
-    else if (role === 'manager') { managerHome(); }
+    if (role === 'super_admin' || role === 'manager') { adminShell(); }
     else { employeeHome(); }
   }
 
   // ─────────────────────────────────────────────
   // ADMIN SHELL — super_admin เห็นปุ่มสลับ สร้างรอบ / โอนเงิน
   // ─────────────────────────────────────────────
+  // v18 — 4 โหมด (manager ไม่เห็นปุ่มโอนเงิน)
+  var ADMIN_MODES = [];
+
   function adminShell(){
-    document.getElementById('hdSub').textContent = 'แอดมิน · ' + myEmp.name;
-    var h = '<div class="card"><div class="sect-lbl">โหมด</div>'
-      + '<div class="round-pick">'
-      + '<button id="mode_create" class="on" onclick="adminMode(\'create\')">สร้างรอบจ่าย</button>'
-      + '<button id="mode_pay" onclick="adminMode(\'pay\')">โอนเงิน</button>'
-      + '</div></div>'
-      + '<div id="adminBody"></div>';
-    document.getElementById('app').innerHTML = h;
+    var isAdmin = (myEmp.role === 'super_admin');
+    document.getElementById('hdSub').textContent = (isAdmin ? 'แอดมิน · ' : 'ผู้จัดการ · ') + myEmp.name;
+
+    ADMIN_MODES = isAdmin
+      ? [['create','ทำจ่าย'],['status','สถานะ'],['pay','โอนเงิน'],['history','ประวัติ']]
+      : [['create','ทำจ่าย'],['status','สถานะ'],['history','ประวัติ']];
+
+    var btns = '';
+    for (var i=0;i<ADMIN_MODES.length;i++){
+      btns += '<button id="mode_'+ADMIN_MODES[i][0]+'"'+(i===0?' class="on"':'')
+            + ' onclick="adminMode(\''+ADMIN_MODES[i][0]+'\')">'+ADMIN_MODES[i][1]+'</button>';
+    }
+    document.getElementById('app').innerHTML =
+      '<div class="card"><div class="round-pick">'+btns+'</div></div><div id="adminBody"></div>';
     adminMode('create');
   }
 
   function adminMode(mode){
-    document.getElementById('mode_create').classList.toggle('on', mode==='create');
-    document.getElementById('mode_pay').classList.toggle('on', mode==='pay');
-    if (mode === 'create') { managerHome(true); }
-    else { adminHome(true); }
+    for (var i=0;i<ADMIN_MODES.length;i++){
+      var el = document.getElementById('mode_'+ADMIN_MODES[i][0]);
+      if (el) el.classList.toggle('on', ADMIN_MODES[i][0]===mode);
+    }
+    if (mode === 'create')      managerHome(true);
+    else if (mode === 'status') statusHome();
+    else if (mode === 'pay')    adminHome(true);
+    else                        historyHome();
   }
 
   // ─────────────────────────────────────────────
-  // MANAGER — สเตจ 1 สร้างรอบ + กรอกยอด
+  // MANAGER — v18 ทำจ่าย (เลือกคน · เลือกรอบในการ์ด · กรอกยอดเอง)
   // ─────────────────────────────────────────────
-  var curRound = null, curEmployees = [];
+  var curGroup = 'branch', curPeriod = '', curEmployees = [], curMeta = {}, curSearch = '';
 
   function managerHome(nested){
     var target = nested ? 'adminBody' : 'app';
-    if (!nested) document.getElementById('hdSub').textContent = 'ผู้จัดการ · ' + myEmp.name;
-    var h = '<div class="card"><div class="sect-lbl">เลือกรอบจ่าย</div>'
-      + '<div class="round-pick">'
-      + '<button onclick="pickRound(\'mid\',this)">กลางเดือน (20)</button>'
-      + '<button onclick="pickRound(\'end\',this)">สิ้นเดือน (5)</button>'
-      + '<button onclick="pickRound(\'b15\',this)">ร้านหลัก (30)</button>'
-      + '</div></div>'
-      + '<div id="roundBody"></div>';
-    document.getElementById(target).innerHTML = h;
+    document.getElementById(target).innerHTML = '<div class="spinner"></div>';
+    loadRound(target);
   }
 
-  function pickRound(r, btn){
-    curRound = r;
-    var btns = btn.parentNode.querySelectorAll('button');
-    for (var i=0;i<btns.length;i++) btns[i].classList.remove('on');
-    btn.classList.add('on');
-    document.getElementById('roundBody').innerHTML = '<div class="spinner"></div>';
-    callGAS('createPayrollRound', { round: r }).then(function(res){
-      if (!res.ok) { document.getElementById('roundBody').innerHTML = '<div class="banner warn"><span class="ic">⚠️</span><div>'+esc(res.message||res.error)+'</div></div>'; return; }
-      curEmployees = res.employees;
-      renderManagerList();
-    });
+  function loadRound(target){
+    target = target || 'adminBody';
+    callGAS('createPayrollRound', { group: curGroup, period: curPeriod || undefined })
+      .then(function(res){
+        if (!res.ok){
+          document.getElementById(target).innerHTML =
+            '<div class="banner warn"><span class="ic">⚠️</span><div>'+esc(res.message||res.error)+'</div></div>';
+          return;
+        }
+        curMeta = res;
+        curPeriod = res.period;
+        curEmployees = res.employees;
+        for (var i=0;i<curEmployees.length;i++){
+          var e = curEmployees[i];
+          e._sel   = false;                       // v18: ไม่ติ๊กให้ เลือกเอง
+          e._round = res.default_round;
+          e._exp   = bucket(e)._sum();
+          e._ded   = 0;
+          e._net   = '';                          // ปล่อยว่าง กรอกเอง
+        }
+        renderManagerShell(target);
+      });
+  }
+
+  function bucket(e){
+    var b = (e._round === 'mid') ? e.expense_mid : e.expense_end;
+    b = b || { sum:0, items:[] };
+    b._sum = function(){ return b.sum; };
+    return b;
+  }
+
+  function renderManagerShell(target){
+    var mopts = monthOptions(curPeriod);
+    var h = '<div class="card">'
+      + '<div class="round-pick" style="margin-bottom:10px">'
+      +   '<button id="g_branch"'+(curGroup==='branch'?' class="on"':'')+' onclick="setGroup(\'branch\')">สาขา</button>'
+      +   '<button id="g_main"'+(curGroup==='main'?' class="on"':'')+' onclick="setGroup(\'main\')">ร้านหลัก</button>'
+      + '</div>'
+      + '<div class="per-bar"><span>เดือนค่าแรง</span>'
+      +   '<select onchange="setPeriod(this.value)">'+mopts+'</select>'
+      +   '<span>· กลางเดือน <b>'+esc(curMeta.range_mid)+'</b> · ปลายเดือน <b>'+esc(curMeta.range_end)+'</b></span>'
+      + '</div>'
+      + '<input class="srch" id="srch" placeholder="ค้นหาชื่อพนักงาน…" value="'+esc(curSearch)+'" oninput="setSearch(this.value)">'
+      + '</div>'
+      + '<div id="mgrList"></div>';
+    document.getElementById(target).innerHTML = h;
+    renderManagerList();
+  }
+
+  function monthOptions(cur){
+    var out = '', d = new Date();
+    for (var k=0;k<6;k++){
+      var y = d.getFullYear(), m = d.getMonth()+1-k;
+      while (m<=0){ m+=12; y-=1; }
+      var v = y+'-'+(m<10?'0'+m:m);
+      out += '<option value="'+v+'"'+(v===cur?' selected':'')+'>'+v+'</option>';
+    }
+    return out;
+  }
+
+  function setGroup(g){ curGroup=g; curSearch=''; document.getElementById('adminBody').innerHTML='<div class="spinner"></div>'; loadRound(); }
+  function setPeriod(p){ curPeriod=p; document.getElementById('adminBody').innerHTML='<div class="spinner"></div>'; loadRound(); }
+  function setSearch(v){ curSearch = v; renderManagerList(); }
+
+  function visibleIdx(){
+    var q = curSearch.trim().toLowerCase(), out = [];
+    for (var i=0;i<curEmployees.length;i++){
+      if (!q || curEmployees[i].name.toLowerCase().indexOf(q) !== -1) out.push(i);
+    }
+    return out;
   }
 
   function renderManagerList(){
-    var isMid = (curRound === 'mid');
-    var h = '<div class="banner info"><span class="ic">👥</span><div>'
-      + (isMid ? 'ติ๊กเลือกคนที่จ่ายรอบนี้ แล้วกรอก/แก้ตัวเลข' : 'ตรวจ/แก้ตัวเลขแต่ละคน แล้วกดส่ง')
-      + '</div></div>';
+    var idx = visibleIdx(), n = 0;
+    for (var i=0;i<curEmployees.length;i++) if (curEmployees[i]._sel) n++;
 
-    if (curEmployees.length === 0){
-      h += '<div class="muted">ไม่มีพนักงานในรอบนี้</div>';
-      document.getElementById('roundBody').innerHTML = h;
-      return;
+    var h = '<div class="selbar"><span>เลือกแล้ว <b>'+n+'</b> คน · แสดง '+idx.length+'/'+curEmployees.length+'</span>'
+          + '<button onclick="clearSel()">ล้างที่เลือก</button></div>';
+
+    if (idx.length === 0){
+      h += '<div class="muted">ไม่พบพนักงาน</div>';
+    } else {
+      for (var k=0;k<idx.length;k++) h += cardHtml(idx[k]);
+      h += '<button class="btn" onclick="submitRound()">ส่งให้พนักงานกรอกบัญชี ('+n+') →</button>';
+    }
+    document.getElementById('mgrList').innerHTML = h;
+  }
+
+  function clearSel(){
+    for (var i=0;i<curEmployees.length;i++) curEmployees[i]._sel = false;
+    renderManagerList();
+  }
+
+  function cardHtml(i){
+    var e = curEmployees[i];
+    var b = bucket(e);
+    var rng = (e._round === 'mid') ? curMeta.range_mid : curMeta.range_end;
+
+    var h = '<div class="card'+(e._sel?' sel':'')+'" id="c_'+i+'">';
+    h += '<div class="check-row'+(e._sel?' on':'')+'" onclick="toggleSel('+i+')"><div class="cb">✓</div>'
+       + '<div class="nm">'+esc(e.name)+'</div></div>';
+    h += '<div class="line sub"><span class="k">'+esc(e.branch_name)+'</span>'
+       + '<span class="v">เงินเดือน '+fmt(e.salary)+'</span></div>';
+
+    // เตือนถ้ามีรายการของ period นี้อยู่แล้ว
+    if (e.already && e.already.length){
+      var tags = '';
+      for (var a=0;a<e.already.length;a++){
+        tags += '<span class="pill go">'+(e.already[a].round==='mid'?'กลางเดือน':'ปลายเดือน')
+             +  ' · '+esc(e.already[a].status)+'</span>';
+      }
+      h += '<div style="margin:6px 0">'+tags+'</div>';
     }
 
-    for (var i=0;i<curEmployees.length;i++){
-      var e = curEmployees[i];
-      var done = (e.already_status && e.already_status !== '');
-      h += '<div class="card" data-idx="'+i+'" '+(done?'style="opacity:.5"':'')+'>';
-      h += '<div class="emp-head"><div class="avatar">'+esc(e.name.charAt(0))+'</div>'
-        + '<div class="info"><h3>'+esc(e.name)+'</h3><p>'+esc(e.branch_name)+' · เงินเดือน '+fmt(e.salary)+'</p></div></div>';
+    h += '<div class="rpick">'
+       +   '<button'+(e._round==='mid'?' class="on"':'')+' onclick="setCardRound('+i+',\'mid\')">กลางเดือน</button>'
+       +   '<button'+(e._round==='end'?' class="on"':'')+' onclick="setCardRound('+i+',\'end\')">ปลายเดือน</button>'
+       + '</div>';
+    h += '<div class="rng">ค่าแรง '+esc(rng)+'</div>';
 
-      if (done){
-        h += '<div class="banner ok" style="margin:0"><span class="ic">✓</span><div>รอบนี้ดำเนินการแล้ว ('+esc(e.already_status)+')</div></div></div>';
-        continue;
-      }
+    h += '<div class="efield"><span class="k">ยอดเบิก<span class="tag auto">auto·แก้ได้</span></span>'
+       + '<input type="text" inputmode="numeric" value="'+fmt(e._exp)+'" data-i="'+i+'" data-f="exp" oninput="onNum(this)"></div>';
+    h += expDetailHtml(i, b);
 
-      if (isMid){
-        h += '<div class="check-row on" data-check="'+i+'" onclick="toggleCheck('+i+')"><div class="cb">✓</div>'
-          + '<div class="nm">จ่ายรอบนี้</div></div>';
-      }
+    h += '<div class="efield"><span class="k">ยอดหัก<span class="tag">กรอก</span></span>'
+       + '<input type="text" inputmode="numeric" value="'+(e._ded?fmt(e._ded):'')+'" placeholder="0" data-i="'+i+'" data-f="ded" oninput="onNum(this)"></div>';
 
-      // ยอด prepaid (เฉพาะ end ที่มี)
-      if (curRound === 'end' && e.amount_prepaid > 0){
-        h += '<div class="hist-box">'
-          + '<div class="line sub"><span class="k">จ่ายกลางเดือนไปแล้ว</span><span class="v">'+fmt(e.amount_prepaid)+'</span></div>'
-          + '</div>';
-      }
+    h += '<div class="efield"><span class="k" style="font-weight:700">ยอดต้องจ่าย<span class="tag">กรอกเอง</span></span>'
+       + '<input type="text" inputmode="numeric" class="need" value="'+(e._net===''?'':fmt(e._net))+'" placeholder="กรอก" data-i="'+i+'" data-f="net" oninput="onNum(this)"></div>';
 
-      h += '<div class="line"><span class="k">เงินเดือน'+(isMid?' ÷ 2':'')+'</span><span class="v">'+fmt(isMid?e.salary/2:e.salary)+'</span></div>';
-      h += '<div class="efield"><span class="k">เบิก<span class="tag auto">auto·แก้ได้</span></span>'
-        + '<input type="text" inputmode="numeric" value="'+fmt(e.amount_expense)+'" oninput="recalc('+i+')" data-f="expense"></div>';
-      if (curRound === 'end' && e.amount_prepaid > 0){
-        h += '<div class="line minus"><span class="k">− จ่ายกลางเดือน</span><span class="v">'+fmt(e.amount_prepaid)+'</span></div>';
-      }
-      h += '<div class="efield"><span class="k">ยอดหัก<span class="tag">กรอก</span></span>'
-        + '<input type="text" inputmode="numeric" value="'+fmt(e.amount_deduct)+'" oninput="recalc('+i+')" data-f="deduct"></div>';
-      h += '<div class="line total"><span class="k">'+(isMid?'จ่ายกลางเดือน':'จ่ายสิ้นเดือน')+'</span><span class="v" data-net="'+i+'">'+fmt(e.amount_net)+'</span></div>';
-      h += '</div>';
+    // v18: รอบกลางเดือนของเดือนเดียวกัน — โชว์ให้ดู ไม่หักให้
+    if (e._round === 'end' && e.prepaid && e.prepaid.has){
+      h += '<div class="hist-box">'
+        +  '<div class="line sub"><span class="k">รอบกลางเดือนเดือนนี้จ่ายไปแล้ว</span>'
+        +  '<span class="v">'+fmt(e.prepaid.amount_net)+'</span></div>'
+        +  '<button type="button" class="exp-toggle" id="pb_'+i+'" onclick="togglePrepaid('+i+')">▸ ดูรายละเอียดรอบกลางเดือน</button>'
+        +  '<div class="exp-list" id="pl_'+i+'">'
+        +    '<div class="exp-row"><span class="d">เบิก</span><span class="r"></span><span class="a">'+fmt(e.prepaid.amount_expense)+'</span></div>'
+        +    '<div class="exp-row"><span class="d">หัก</span><span class="r"></span><span class="a">'+fmt(e.prepaid.amount_deduct)+'</span></div>'
+        +    '<div class="exp-row"><span class="d">สถานะ</span><span class="r"></span><span class="a">'+esc(e.prepaid.status)+'</span></div>'
+        +    (e.prepaid.paid_disp ? '<div class="exp-row"><span class="d">โอนวันที่</span><span class="r"></span><span class="a">'+esc(e.prepaid.paid_disp)+'</span></div>' : '')
+        +    '<div class="exp-row sum"><span class="d">จ่ายจริง</span><span class="r"></span><span class="a">'+fmt(e.prepaid.amount_net)+'</span></div>'
+        +  '</div>'
+        +  '<div class="rng" style="margin:6px 0 0">ℹ️ แสดงให้ดูเฉยๆ — ระบบไม่หักให้ ยอดต้องจ่ายกรอกเอง</div>'
+        +  '</div>';
     }
 
-    h += '<button class="btn" onclick="submitRound()">ส่งให้พนักงานกรอกบัญชี →</button>';
-    document.getElementById('roundBody').innerHTML = h;
+    h += '</div>';
+    return h;
+  }
+
+  function expDetailHtml(i, b){
+    var items = b.items || [];
+    if (!items.length) return '<div class="exp-none">ไม่มีรายการเบิกในช่วงนี้</div>';
+    var rows = '';
+    for (var k=0;k<items.length;k++){
+      rows += '<div class="exp-row"><span class="d">'+esc(items[k].date_disp)+'</span>'
+           +  '<span class="r">'+esc(items[k].reason||'—')+'</span>'
+           +  '<span class="a">'+fmt(items[k].amount)+'</span></div>';
+    }
+    rows += '<div class="exp-row sum"><span class="d">รวม</span><span class="r"></span><span class="a">'+fmt(b.sum)+'</span></div>';
+    return '<div class="exp-wrap">'
+      + '<button type="button" class="exp-toggle" id="xb_'+i+'" onclick="toggleExp('+i+')">▸ ดูรายการเบิก '+items.length+' รายการ</button>'
+      + '<div class="exp-list" id="xl_'+i+'">'+rows+'</div></div>';
+  }
+
+  function toggleExp(i){ flip('xl_'+i,'xb_'+i); }
+  function togglePrepaid(i){ flip('pl_'+i,'pb_'+i); }
+  function flip(listId, btnId){
+    var l = document.getElementById(listId), b = document.getElementById(btnId);
+    var open = (l.style.display === 'block');
+    l.style.display = open ? 'none' : 'block';
+    b.textContent = (open ? '▸' : '▾') + b.textContent.slice(1);
   }
 
   function parseNum(s){ return Number(String(s).replace(/[^0-9.]/g,'')) || 0; }
 
-  function toggleCheck(i){
-    var row = document.querySelector('[data-check="'+i+'"]');
-    row.classList.toggle('on');
-    curEmployees[i]._pay = row.classList.contains('on');
+  function toggleSel(i){
+    curEmployees[i]._sel = !curEmployees[i]._sel;
+    renderManagerList();
   }
 
-  function recalc(i){
-    var card = document.querySelector('.card[data-idx="'+i+'"]');
-    var expense = parseNum(card.querySelector('[data-f="expense"]').value);
-    var deduct  = parseNum(card.querySelector('[data-f="deduct"]').value);
+  function setCardRound(i, r){
     var e = curEmployees[i];
-    var base = (curRound === 'mid') ? e.salary/2 : e.salary; // mid = ครึ่งเดือน
-    var net = base - expense - e.amount_prepaid - deduct;
-    e.amount_expense = expense;
-    e.amount_deduct = deduct;
-    e.amount_net = net;
-    card.querySelector('[data-net="'+i+'"]').textContent = fmt(net);
+    e._round = r;
+    e._exp = bucket(e).sum;          // เปลี่ยนรอบ → ยอดเบิก auto เปลี่ยนตามช่วงวัน
+    var old = document.getElementById('c_'+i);
+    if (old) old.outerHTML = cardHtml(i);
+  }
+
+  function onNum(el){
+    var i = Number(el.getAttribute('data-i')), f = el.getAttribute('data-f');
+    var e = curEmployees[i];
+    if (f === 'exp') e._exp = parseNum(el.value);
+    else if (f === 'ded') e._ded = parseNum(el.value);
+    else e._net = (String(el.value).trim() === '') ? '' : parseNum(el.value);
   }
 
   function submitRound(){
-    var isMid = (curRound === 'mid');
-    var entries = [];
+    var entries = [], warn = [];
     for (var i=0;i<curEmployees.length;i++){
       var e = curEmployees[i];
-      if (e.already_status && e.already_status !== '') continue; // ข้ามที่ทำแล้ว
-      var pay = isMid ? (e._pay !== false) : true; // mid default ติ๊ก (on) เว้นแต่ปิด
-      entries.push({
-        userId: e.userId, salary: e.salary,
-        amount_expense: e.amount_expense, amount_prepaid: e.amount_prepaid,
-        amount_deduct: e.amount_deduct, amount_net: e.amount_net, pay: pay
-      });
+      if (!e._sel) continue;
+      if (e._net === '' || e._net === null){ toast('ยังไม่ได้กรอกยอดต้องจ่ายของ '+e.name); return; }
+      if (e.already && e.already.length){
+        for (var a=0;a<e.already.length;a++){
+          if (e.already[a].round === e._round) warn.push(e.name);
+        }
+      }
+      entries.push({ userId:e.userId, round:e._round, salary:e.salary,
+                     amount_expense:e._exp, amount_deduct:e._ded, amount_net:e._net });
     }
-    if (entries.length === 0){ toast('ไม่มีรายการให้ส่ง'); return; }
+    if (entries.length === 0){ toast('ยังไม่ได้เลือกใคร'); return; }
+    if (warn.length && !confirm('มีรายการรอบนี้อยู่แล้ว: '+warn.join(', ')+'\nจ่ายซ้ำ?')) return;
 
     var btn = event.target; btn.disabled = true; btn.textContent = 'กำลังส่ง...';
-    callGAS('submitPayrollRound', { round: curRound, entries: entries }).then(function(res){
+    callGAS('submitPayrollRound', { period: curPeriod, entries: entries }).then(function(res){
       if (!res.ok){ toast(res.message||res.error); btn.disabled=false; btn.textContent='ส่งให้พนักงานกรอกบัญชี →'; return; }
-      document.getElementById('roundBody').innerHTML =
+      document.getElementById('mgrList').innerHTML =
         '<div class="banner ok"><span class="ic">✅</span><div>'+esc(res.message)+'</div></div>';
     });
+  }
+
+  // ─────────────────────────────────────────────
+  // v18 — หน้าสถานะ (process)
+  // ─────────────────────────────────────────────
+  function statusHome(){
+    document.getElementById('adminBody').innerHTML = '<div class="spinner"></div>';
+    callGAS('getPayrollAdminQueue').then(function(res){
+      if (!res.ok){
+        document.getElementById('adminBody').innerHTML =
+          '<div class="banner warn"><span class="ic">⚠️</span><div>'+esc(res.message||res.error)+'</div></div>';
+        return;
+      }
+      var q = res.queue||[], pd = res.pending||[];
+      var h = '<div class="card"><div class="sect-lbl">⏳ รอพนักงานกรอกเลขบัญชี ('+pd.length+')</div>';
+      if (!pd.length) h += '<div class="muted">ไม่มี</div>';
+      for (var i=0;i<pd.length;i++){
+        h += '<div class="hrow"><div class="l"><div class="n">'+esc(pd[i].name)+'</div>'
+          +  '<div class="s">'+esc(pd[i].branch_name)+' · ค่าแรง '+esc(pd[i].range_label)+'</div></div>'
+          +  '<div class="r"><div class="a">'+fmt(pd[i].amount_net)+'</div>'
+          +  '<div class="d">ส่งเมื่อ '+esc(pd[i].waiting_disp||'—')+'</div></div></div>';
+      }
+      h += '</div><div class="card"><div class="sect-lbl">🏦 รอโอนเงิน ('+q.length+')</div>';
+      if (!q.length) h += '<div class="muted">ไม่มี</div>';
+      for (var k=0;k<q.length;k++){
+        h += '<div class="hrow"><div class="l"><div class="n">'+esc(q[k].name)+'</div>'
+          +  '<div class="s">'+esc(q[k].branch_name)+' · ค่าแรง '+esc(q[k].range_label)+'<br>'
+          +  esc(q[k].bank_name)+' · '+esc(q[k].bank_account_no)+'</div></div>'
+          +  '<div class="r"><div class="a">'+fmt(q[k].amount_net)+'</div></div></div>';
+      }
+      h += '</div>';
+      document.getElementById('adminBody').innerHTML = h;
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // v18 — หน้าประวัติการโอน + search
+  // ─────────────────────────────────────────────
+  var histAll = [], histQ = '';
+
+  function historyHome(){
+    document.getElementById('adminBody').innerHTML = '<div class="spinner"></div>';
+    callGAS('getPayrollHistory').then(function(res){
+      if (!res.ok){
+        document.getElementById('adminBody').innerHTML =
+          '<div class="banner warn"><span class="ic">⚠️</span><div>'+esc(res.message||res.error)+'</div></div>';
+        return;
+      }
+      histAll = res.history||[]; histQ = '';
+      document.getElementById('adminBody').innerHTML =
+        '<div class="card"><input class="srch" id="hsrch" placeholder="ค้นหาชื่อ / สาขา / ธนาคาร…" oninput="setHistQ(this.value)">'
+        + '<div class="muted" id="hcount"></div></div><div id="histList"></div>';
+      renderHist();
+    });
+  }
+
+  function setHistQ(v){ histQ = v; renderHist(); }
+
+  function renderHist(){
+    var q = histQ.trim().toLowerCase();
+    var rows = histAll.filter(function(r){
+      if (!q) return true;
+      return (r.name+' '+r.branch_name+' '+r.bank_name+' '+r.bank_account_name).toLowerCase().indexOf(q) !== -1;
+    });
+    document.getElementById('hcount').textContent = 'ทั้งหมด '+rows.length+' รายการ';
+
+    if (!rows.length){ document.getElementById('histList').innerHTML = '<div class="muted">ไม่พบรายการ</div>'; return; }
+    var h = '<div class="card">';
+    for (var i=0;i<rows.length;i++){
+      var r = rows[i];
+      h += '<div class="hrow"><div class="l">'
+        +  '<div class="n">'+esc(r.name)+'</div>'
+        +  '<div class="s">'+esc(r.branch_name)+' · ค่าแรง '+esc(r.range_label)+'<br>'
+        +  esc(r.bank_name)+' · '+esc(r.bank_account_name)+' · '+esc(r.bank_account_no)+'<br>'
+        +  'โอนโดย '+esc(r.paid_by||'—')
+        +  (r.slip_url ? ' · <a href="'+esc(r.slip_url)+'" target="_blank">ดูสลิป</a>' : '')
+        +  '</div></div>'
+        +  '<div class="r"><div class="a">'+fmt(r.amount_net)+'</div>'
+        +  '<div class="d">'+esc(r.paid_disp)+'</div></div></div>';
+    }
+    h += '</div>';
+    document.getElementById('histList').innerHTML = h;
   }
 
   // ─────────────────────────────────────────────
@@ -335,11 +572,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
     document.getElementById('app').innerHTML = '<div class="spinner"></div>';
     callGAS('getMyPayroll').then(function(res){
       if (!res.ok){ showMsg(res.message||res.error); return; }
-      renderEmployee(res.payroll, res.banks);
+      renderEmployee(res.payroll, res.banks, res.last_bank);
     });
   }
 
-  function renderEmployee(list, banks){
+  function renderEmployee(list, banks, lastBank){
+    lastBank = lastBank || {};
     if (!list || list.length === 0){
       document.getElementById('app').innerHTML = '<div class="muted">ยังไม่มีรายการเงินเดือนรอบนี้</div>';
       return;
@@ -348,7 +586,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
     for (var i=0;i<list.length;i++){
       var p = list[i];
       h += '<div class="card">';
-      h += '<div class="sect-lbl">'+roundName(p.round)+' · ยอดที่จะได้รับ</div>';
+      h += '<div class="sect-lbl">'+roundName(p.round)+(p.range_label?' · ค่าแรง '+esc(p.range_label):'')+'</div>';
       h += '<div class="line sub"><span class="k">เงินเดือน</span><span class="v">'+fmt(p.salary)+'</span></div>';
       h += '<div class="line sub"><span class="k">เบิก</span><span class="v">−'+fmt(p.amount_expense)+'</span></div>';
       if (p.amount_prepaid>0) h += '<div class="line sub"><span class="k">จ่ายกลางเดือนไปแล้ว</span><span class="v">−'+fmt(p.amount_prepaid)+'</span></div>';
@@ -360,14 +598,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
         if (p.slip_url) h += '<iframe class="slip-frame" src="'+esc(p.slip_url)+'"></iframe>';
       } else if (p.status === 'sent_emp' || p.status === 'sent_admin'){
         // ฟอร์มกรอกบัญชี
-        var opts = '<option value="" disabled '+(p.bank_name?'':'selected')+'>เลือกธนาคาร</option>';
+        // v18: เคยกรอกไว้แล้ว → เติมให้อัตโนมัติ (แถวนี้ยังว่าง = ดึงของครั้งก่อนมาใส่)
+        var vBank = p.bank_name || lastBank.bank_name || '';
+        var vName = p.bank_account_name || lastBank.bank_account_name || '';
+        var vNo   = p.bank_account_no || lastBank.bank_account_no || '';
+        var prefilled = (!p.bank_account_no && vNo);
+
+        var opts = '<option value="" disabled '+(vBank?'':'selected')+'>เลือกธนาคาร</option>';
         for (var b=0;b<banks.length;b++){
-          opts += '<option '+(p.bank_name===banks[b]?'selected':'')+'>'+esc(banks[b])+'</option>';
+          opts += '<option '+(vBank===banks[b]?'selected':'')+'>'+esc(banks[b])+'</option>';
         }
         h += '<div class="sect-lbl" style="margin-top:14px">บัญชีรับเงิน '+(p.status==='sent_admin'?'(แก้ได้จนกว่าจะโอน)':'')+'</div>';
         h += '<div class="form-grp"><label>ธนาคาร</label><select data-pid="'+esc(p.payroll_id)+'" data-f="bank">'+opts+'</select></div>';
-        h += '<div class="form-grp"><label>ชื่อบัญชี</label><input type="text" data-pid="'+esc(p.payroll_id)+'" data-f="acctname" value="'+esc(p.bank_account_name)+'" placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"></div>';
-        h += '<div class="form-grp"><label>เลขที่บัญชี</label><input type="text" inputmode="numeric" data-pid="'+esc(p.payroll_id)+'" data-f="acctno" value="'+esc(p.bank_account_no)+'" placeholder="xxx-x-xxxxx-x"></div>';
+        h += '<div class="form-grp"><label>ชื่อบัญชี</label><input type="text" data-pid="'+esc(p.payroll_id)+'" data-f="acctname" value="'+esc(vName)+'" placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"></div>';
+        h += '<div class="form-grp"><label>เลขที่บัญชี</label><input type="text" inputmode="numeric" data-pid="'+esc(p.payroll_id)+'" data-f="acctno" value="'+esc(vNo)+'" placeholder="xxx-x-xxxxx-x"></div>';
+        if (prefilled) h += '<div class="banner info" style="margin:0 0 10px"><span class="ic">💡</span><div>เติมจากบัญชีที่เคยใช้ครั้งก่อน — ตรวจแล้วกดยืนยันได้เลย</div></div>';
         h += '<button class="btn" onclick="submitBank(\''+esc(p.payroll_id)+'\')">'+(p.status==='sent_admin'?'อัปเดตบัญชี':'ยืนยัน ส่งให้แอดมิน →')+'</button>';
         if (p.status==='sent_admin') h += '<div class="banner info" style="margin-top:10px"><span class="ic">⏳</span><div>ส่งข้อมูลแล้ว รอการโอนเงิน</div></div>';
       }
