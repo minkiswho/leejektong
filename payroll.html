@@ -198,12 +198,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
     })
     .catch(function(e){
       document.getElementById('loading').classList.add('hidden');
-      showMsg('เชื่อมต่อไม่ได้ ลองเปิดใหม่ใน LINE');
+      // v18.1: โชว์ error จริง — ของเดิมกลืนสาเหตุทิ้ง ทำให้ debug ไม่ได้เลย
+      var d = (e && (e.message || e.code)) ? (e.message || e.code) : String(e);
+      showMsg('เชื่อมต่อไม่ได้ ลองเปิดใหม่ใน LINE\n[' + d + ']');
       console.error(e);
     });
 
   function showMsg(m){
-    document.getElementById('app').innerHTML = '<div class="banner warn"><span class="ic">⚠️</span><div>'+esc(m)+'</div></div>';
+    document.getElementById('app').innerHTML =
+      '<div class="banner warn"><span class="ic">⚠️</span><div style="white-space:pre-line">'+esc(m)+'</div></div>';
   }
 
   // ============ ROUTER ตาม role ============
@@ -571,8 +574,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
     document.getElementById('hdSub').textContent = myEmp.name + ' · ' + myEmp.branch_name;
     document.getElementById('app').innerHTML = '<div class="spinner"></div>';
     callGAS('getMyPayroll').then(function(res){
-      if (!res.ok){ showMsg(res.message||res.error); return; }
+      if (!res.ok){ showMsg('โหลดเงินเดือนไม่สำเร็จ: ' + (res.message || res.error || '?')); return; }
       renderEmployee(res.payroll, res.banks, res.last_bank);
+    }).catch(function(e){
+      // v18.1: ดักแยกจาก catch ตัวนอก จะได้รู้ว่าพังตอนโหลดข้อมูล ไม่ใช่ตอน login
+      var d = (e && (e.message || e.code)) ? (e.message || e.code) : String(e);
+      showMsg('หน้าเงินเดือนมีปัญหา\n[' + d + ']');
+      console.error(e);
     });
   }
 
