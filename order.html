@@ -646,6 +646,21 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // โปรไฟล์ที่หน้าแรกเก็บไว้ — ใช้ได้เฉพาะเมื่อเป็น userId เดียวกับที่ LINE ให้มาตอนนี้
+  function getSessionEmp() {
+    try {
+      var sUid = sessionStorage.getItem('lj_uid');
+      var sBid = Number(sessionStorage.getItem('lj_branch_id'));
+      if (!uid || sUid !== uid || !sBid) return null;
+      return {
+        name:        sessionStorage.getItem('lj_name') || '',
+        branch_id:   sBid,
+        branch_name: sessionStorage.getItem('lj_branch_name') || '',
+        role:        sessionStorage.getItem('lj_role') || ''
+      };
+    } catch (e) { return null; }
+  }
+
   // ── INIT ─────────────────────────────────────────
   liff.init({ liffId: LIFF_ID })
     .then(function() {
@@ -661,6 +676,23 @@
 
       if (name)   { el('barName').textContent   = name;   el('headerBranch').textContent = branch || ''; }
       if (branch) { el('barBranch').textContent = branch; }
+
+      var loadListAndBranches = function() {
+        // โหลดสาขา + รายการสินค้า พร้อมกัน (คู่ขนาน — ไม่ให้หน้าจอช้า)
+        return Promise.all([
+          callGAS({ action: 'getBranches' }),
+          callGAS({ action: 'getSupplyList' })
+        ]);
+      };
+
+      // v20: หน้าแรกเพิ่งเช็คโปรไฟล์มาแล้ว (ของ userId เดียวกัน) → ใช้เลย ไม่ต้องถาม GAS ซ้ำ
+      //   ประหยัด 1 รอบเต็ม · ตอนกดส่ง backend ยังเช็คตัวตนจริงทุกครั้ง (source of truth)
+      //   ไม่มี session (เปิดหน้านี้ตรง) หรือ userId ไม่ตรง → ถาม GAS แบบ v19
+      var sessEmp = getSessionEmp();
+      if (sessEmp) {
+        emp = sessEmp;
+        return loadListAndBranches();
+      }
 
       // โหลดโปรไฟล์ก่อน (ต้องรู้ branch_id ของพนักงานก่อน เพื่อตั้ง default สาขา)
       // v19: getProfile พลาด → ลองซ้ำ 1 ครั้งก่อน (ช่วงคนสั่งพร้อมกันเที่ยง-บ่ายโมง)
@@ -679,11 +711,7 @@
             el('headerBranch').textContent = emp.branch_name;
           }
         }
-        // โหลดสาขา + รายการสินค้า พร้อมกัน (คู่ขนาน — ไม่ให้หน้าจอช้า)
-        return Promise.all([
-          callGAS({ action: 'getBranches' }),
-          callGAS({ action: 'getSupplyList' })
-        ]);
+        return loadListAndBranches();
       });
     })
     .then(function(results) {
@@ -694,7 +722,8 @@
       // เติม dropdown สาขา (default = สาขาพนักงาน)
       if (branchData && branchData.ok && branchData.branches && branchData.branches.length) {
         // default = สาขาจากโปรไฟล์ → ถ้าไม่มี ใช้ที่หน้าแรกเก็บไว้ → ถ้าไม่มีอีก ปล่อยให้พนักงานเลือกเอง (ห้ามเดา)
-        var defId = (emp && emp.branch_id) || sessionStorage.getItem('lj_branch_id') || null;
+        var sess  = getSessionEmp();
+        var defId = (emp && emp.branch_id) || (sess && sess.branch_id) || null;
         renderBranches(branchData.branches, defId);
       }
 

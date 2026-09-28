@@ -692,27 +692,159 @@
       });
   }
 
-  // ── INIT ──────────────────────────────────────
-  var initDone = false;
+  // ── PROFILE CACHE (v20) ───────────────────────
+  // จำโปรไฟล์ล่าสุดไว้ในเครื่อง (แยกตาม LINE userId) → เปิดแอปครั้งถัดไป โชว์ชื่อ+ปุ่มทันที
+  // แล้วค่อยเช็คกับ GAS เบื้องหลัง → ได้ของใหม่ก็วาดทับ
+  // 🔴 สิทธิ์จริงยังตัดสินที่ backend ทุกหน้า — cache มีผลแค่ "ปุ่มไหนโชว์" ไม่ใช่ "ข้อมูลไหนเห็น"
+  var PROF_CACHE_PREFIX = 'lj_prof_v1_';
+  var PROF_CACHE_MAX_MS = 30 * 24 * 60 * 60 * 1000;   // เก่ากว่า 30 วัน = ไม่ใช้
 
-  // watchdog: ถ้า init/getProfile ค้างเกิน 9 วิ → แสดง error + ทางออก
-  var watchdog = setTimeout(function() {
-    if (initDone) return;
-    initDone = true;
-    // ซ่อน skeleton
+  function readProfCache(u) {
+    try {
+      var j = JSON.parse(localStorage.getItem(PROF_CACHE_PREFIX + u) || 'null');
+      if (!j || !j.emp || !j.emp.branch_id || !j.ts) return null;
+      if (Date.now() - j.ts > PROF_CACHE_MAX_MS) return null;
+      return j.emp;
+    } catch (e) { return null; }   // เครื่องไม่ให้ใช้ localStorage → ทำงานแบบเดิม
+  }
+  function writeProfCache(u, emp) {
+    try { localStorage.setItem(PROF_CACHE_PREFIX + u, JSON.stringify({ emp: emp, ts: Date.now() })); } catch (e) {}
+  }
+  function clearProfCache(u) {
+    try { localStorage.removeItem(PROF_CACHE_PREFIX + u); } catch (e) {}
+  }
+
+  // ปุ่มที่โชว์ตามสิทธิ์ — ซ่อนก่อนทุกครั้ง แล้วค่อยเปิดตามโปรไฟล์ล่าสุด (กันปุ่มค้างตอนลดสิทธิ์)
+  var GATED_BTNS = ['btnApprove','btnApproveLeave','btnRevenue','btnPick','btnInspect','btnInspectView'];
+  function hideGatedButtons() {
+    GATED_BTNS.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
+  }
+  function clearSession() {
+    ['lj_uid','lj_name','lj_branch_id','lj_branch_name','lj_role'].forEach(function(k) {
+      sessionStorage.removeItem(k);
+    });
+  }
+
+  // วาดโปรไฟล์ + ปุ่มตามสิทธิ์ + เก็บ sessionStorage ให้หน้าอื่นใช้ (ใช้ทั้งตอน cache และตอนของจริง)
+  function applyEmp(emp) {
+    setProfile(emp.name, emp.branch_name, null);
+    // เก็บ uid+branchId ใน sessionStorage ให้หน้าอื่นใช้ต่อ
+    sessionStorage.setItem('lj_uid', uid);
+    sessionStorage.setItem('lj_name', emp.name);
+    sessionStorage.setItem('lj_branch_id', emp.branch_id);
+    sessionStorage.setItem('lj_branch_name', emp.branch_name);
+    sessionStorage.setItem('lj_role', emp.role);
+
+    hideGatedButtons();
+    // โชว์ปุ่มอนุมัติ + รวมยอดห้าง เฉพาะ super_admin / manager
+    if (emp.role === 'super_admin' || emp.role === 'manager') {
+      document.getElementById('btnApprove').style.display = 'flex';
+      document.getElementById('btnApproveLeave').style.display = 'flex';
+      document.getElementById('btnRevenue').style.display = 'flex';
+    }
+    // โชว์ปุ่มจัดของ เฉพาะร้านหลัก (branch_id 15) หรือ super_admin
+    if (Number(emp.branch_id) === 15 || emp.role === 'super_admin') {
+      document.getElementById('btnPick').style.display = 'flex';
+    }
+    // v16: ปุ่มตรวจสาขา / ดูผลตรวจ — สิทธิ์มาจาก backend (inspect_do / inspect_view ในชีต EMPLOYEES)
+    // ถ้า backend ยังเป็นตัวเก่าที่ไม่ส่ง can_* มา → ตกกลับไปใช้กฎ role เดิม (ไม่พังหน้าแรก)
+    var _roleFallback = (emp.role === 'super_admin' || emp.role === 'manager');
+    var _canDo   = (emp.can_inspect_do   === undefined) ? _roleFallback : emp.can_inspect_do;
+    var _canView = (emp.can_inspect_view === undefined) ? _roleFallback : emp.can_inspect_view;
+    if (_canDo)   document.getElementById('btnInspect').style.display = 'flex';
+    if (_canView) document.getElementById('btnInspectView').style.display = 'flex';
+  }
+
+  // วันหยุด + เตือน โหลดครั้งเดียวพอ (ไม่ว่าจะมาจาก cache หรือของจริง)
+  var sideLoaded = false;
+  function startSideLoads() {
+    if (sideLoaded) return;
+    sideLoaded = true;
+    loadMyLeaves();     // โหลดวันหยุดของฉันมาโชว์บนสุด
+    loadMyWarnings();   // v14: การเตือน — แยก request ไม่บล็อกหน้าแรก
+  }
+
+  function clearProfileSkeleton() {
     document.getElementById('profileName').classList.remove('skeleton','sk-name');
     document.getElementById('profileName').textContent = '-';
     document.getElementById('profileBranch').classList.remove('skeleton','sk-branch');
     document.getElementById('profileBranch').textContent = '-';
-    // ถ้าได้ userId มาแล้ว → โชว์ลิงก์ลงทะเบียน
-    if (liffProfile && liffProfile.userId) {
-      document.getElementById('onboardLink').style.display = 'block';
-    } else {
-      // init เองค้าง — โชว์ลิงก์ไว้ด้วย เผื่อ openOnboard ดึง profile แยกได้
-      document.getElementById('onboardLink').style.display = 'block';
-    }
+    document.getElementById('dotLive').style.display = 'none';
+  }
+  function hideError() {
+    document.getElementById('errorCard').style.display = 'none';
+  }
+
+  // ── INIT ──────────────────────────────────────
+  var initDone = false;
+  var shownFromCache = false;
+
+  // watchdog: ถ้า init/getProfile ค้างเกิน 9 วิ (และไม่มี cache ให้โชว์) → แสดง error + ทางออก
+  var watchdog = setTimeout(function() {
+    if (initDone) return;
+    initDone = true;
+    clearProfileSkeleton();
+    // โชว์ลิงก์ลงทะเบียนไว้ เผื่อเป็นคนใหม่ (openOnboard ดึง profile เองได้)
+    document.getElementById('onboardLink').style.display = 'block';
     showError('โหลดข้อมูลช้าผิดปกติ — ลองปิดแล้วเปิดใหม่ใน LINE หรือเช็คว่าเพิ่มบัญชีเป็นเพื่อนแล้ว');
   }, 9000);
+
+  // ได้คำตอบจาก GAS แล้ว
+  function onFreshProfile(data) {
+    if (!data) return;
+
+    if (data.ok) {
+      // ✅ ของจริงมาถึง — วาดทับเสมอ แม้ watchdog ยิงไปแล้ว (เดิมโยนทิ้ง ทำให้คนเห็น error ทั้งที่ข้อมูลมาแล้ว)
+      initDone = true; clearTimeout(watchdog);
+      var emp = data.employee;
+      writeProfCache(uid, emp);
+      applyEmp(emp);
+      hideError();
+      document.getElementById('onboardLink').style.display = 'none';
+      startSideLoads();
+      return;
+    }
+
+    if (data.error === 'USER_NOT_FOUND') {
+      // ❌ ไม่อยู่ในระบบแล้ว (ถูกลบ/ยังไม่ลงทะเบียน) → ล้างทุกอย่างที่จำไว้ ห้ามโชว์ของเก่าต่อ
+      initDone = true; clearTimeout(watchdog);
+      clearProfCache(uid);
+      clearSession();
+      hideGatedButtons();
+      clearProfileSkeleton();
+      document.getElementById('onboardLink').style.display = 'block';
+      showError('ไม่พบข้อมูลพนักงาน กรุณาติดต่อมิ้งค์');
+      return;
+    }
+
+    // error อื่น (เช่น UNAUTHORIZED / SERVER_ERROR)
+    if (shownFromCache) {
+      showError('⚠️ เช็คข้อมูลกับระบบไม่สำเร็จ — ที่เห็นอยู่อาจไม่อัปเดต (' + (data.error || 'UNKNOWN') + ')');
+      return;
+    }
+    if (initDone) return;   // watchdog แสดงไปแล้ว
+    initDone = true; clearTimeout(watchdog);
+    clearProfileSkeleton();
+    showError('เกิดข้อผิดพลาด: ' + (data.error || 'UNKNOWN'));
+  }
+
+  // เชื่อมต่อ GAS ไม่ได้เลย (เน็ต / GAS ตอบเป็นหน้า error)
+  function onProfileFail(e) {
+    console.error(e);
+    var detail = (e && (e.message || e.code)) ? (' [' + (e.code || '') + ' ' + (e.message || '') + ']') : '';
+    if (shownFromCache) {
+      // มีของเก่าโชว์อยู่ → ใช้ต่อได้ แค่บอกว่าอาจไม่อัปเดต (กดเข้าหน้าไหน หน้านั้นจะเช็คกับระบบเอง)
+      showError('⚠️ เชื่อมต่อระบบไม่ได้ — ที่เห็นอยู่อาจไม่อัปเดต' + detail);
+      return;
+    }
+    if (initDone) return;
+    initDone = true; clearTimeout(watchdog);
+    // เชื่อมต่อไม่ได้ → ยังโชว์ลิงก์ เผื่อคนใหม่หา userId ตัวเองได้
+    document.getElementById('onboardLink').style.display = 'block';
+    clearProfileSkeleton();
+    // แสดง error จริงเพื่อ debug (ถ่ายรูปส่งได้)
+    showError('เชื่อมต่อระบบไม่ได้ กรุณาปิดแล้วเปิดใหม่' + detail);
+  }
 
   liff.init({ liffId: LIFF_ID })
     .then(function() {
@@ -726,75 +858,20 @@
       if (!profile) return; // กำลัง redirect login
       uid = profile.userId;
       liffProfile = profile;  // เก็บไว้ให้ onboard modal
-      // ดึง employee profile จาก GAS
-      return callGAS('getProfile');
+
+      // v20: มีโปรไฟล์ที่จำไว้ → โชว์ทันที ไม่ต้องรอ GAS
+      var cached = readProfCache(uid);
+      if (cached) {
+        shownFromCache = true;
+        initDone = true; clearTimeout(watchdog);
+        applyEmp(cached);
+        startSideLoads();
+      }
+
+      // เช็คกับ GAS เสมอ (ของจริงชนะ cache)
+      return callGAS('getProfile').then(onFreshProfile, onProfileFail);
     })
-    .then(function(data) {
-      if (initDone) return;  // watchdog ยิงไปแล้ว อย่าเขียนทับ
-      initDone = true; clearTimeout(watchdog);
-      if (!data) return;
-      if (!data.ok) {
-        // ไม่อยู่ในระบบ → โชว์ลิงก์ลงทะเบียน
-        if (data.error === 'USER_NOT_FOUND') {
-          document.getElementById('onboardLink').style.display = 'block';
-        }
-        showError(data.error === 'USER_NOT_FOUND'
-          ? 'ไม่พบข้อมูลพนักงาน กรุณาติดต่อมิ้งค์'
-          : 'เกิดข้อผิดพลาด: ' + (data.error || 'UNKNOWN'));
-        // ซ่อน skeleton
-        document.getElementById('profileName').classList.remove('skeleton','sk-name');
-        document.getElementById('profileName').textContent = '-';
-        document.getElementById('profileBranch').classList.remove('skeleton','sk-branch');
-        document.getElementById('profileBranch').textContent = '-';
-        return;
-      }
-      // อยู่ในระบบแล้ว → ลิงก์ลงทะเบียนซ่อนไว้ (default ซ่อนอยู่แล้ว)
-      var emp = data.employee;
-      setProfile(emp.name, emp.branch_name, data.pictureUrl || null);
-      // เก็บ uid+branchId ใน sessionStorage ให้หน้าอื่นใช้ต่อ
-      sessionStorage.setItem('lj_uid', uid);
-      sessionStorage.setItem('lj_name', emp.name);
-      sessionStorage.setItem('lj_branch_id', emp.branch_id);
-      sessionStorage.setItem('lj_branch_name', emp.branch_name);
-      sessionStorage.setItem('lj_role', emp.role);
-      // โชว์ปุ่มอนุมัติ + รวมยอดห้าง เฉพาะ super_admin / manager
-      if (emp.role === 'super_admin' || emp.role === 'manager') {
-        document.getElementById('btnApprove').style.display = 'flex';
-        document.getElementById('btnApproveLeave').style.display = 'flex';
-        document.getElementById('btnRevenue').style.display = 'flex';
-      }
-      // โชว์ปุ่มจัดของ เฉพาะร้านหลัก (branch_id 15) หรือ super_admin
-      if (Number(emp.branch_id) === 15 || emp.role === 'super_admin') {
-        document.getElementById('btnPick').style.display = 'flex';
-      }
-      // v16: ปุ่มตรวจสาขา / ดูผลตรวจ — สิทธิ์มาจาก backend (inspect_do / inspect_view ในชีต EMPLOYEES)
-      // แยก 2 ปุ่ม เพราะให้ดูผลอย่างเดียวโดยไม่ให้ตรวจได้
-      // ถ้า backend ยังเป็นตัวเก่าที่ไม่ส่ง can_* มา → ตกกลับไปใช้กฎ role เดิม (ไม่พังหน้าแรก)
-      var _roleFallback = (emp.role === 'super_admin' || emp.role === 'manager');
-      var _canDo   = (emp.can_inspect_do   === undefined) ? _roleFallback : emp.can_inspect_do;
-      var _canView = (emp.can_inspect_view === undefined) ? _roleFallback : emp.can_inspect_view;
-      if (_canDo)   document.getElementById('btnInspect').style.display = 'flex';
-      if (_canView) document.getElementById('btnInspectView').style.display = 'flex';
-      // โหลดวันหยุดของฉันมาโชว์บนสุด
-      loadMyLeaves();
-      // v14: โหลดการเตือน (ขาดส่งยอด / ไม่เช็คอิน) — แยก request ไม่บล็อกหน้าแรก
-      loadMyWarnings();
-    })
-    .catch(function(e) {
-      if (initDone) return;
-      initDone = true; clearTimeout(watchdog);
-      console.error(e);
-      // เชื่อมต่อไม่ได้ → ยังโชว์ลิงก์ เผื่อคนใหม่หา userId ตัวเองได้
-      document.getElementById('onboardLink').style.display = 'block';
-      // ซ่อน skeleton
-      document.getElementById('profileName').classList.remove('skeleton','sk-name');
-      document.getElementById('profileName').textContent = '-';
-      document.getElementById('profileBranch').classList.remove('skeleton','sk-branch');
-      document.getElementById('profileBranch').textContent = '-';
-      // แสดง error จริงเพื่อ debug (ถ่ายรูปส่งได้)
-      var detail = (e && (e.message || e.code)) ? (' [' + (e.code || '') + ' ' + (e.message || '') + ']') : '';
-      showError('เชื่อมต่อระบบไม่ได้ กรุณาปิดแล้วเปิดใหม่' + detail);
-    });
+    .catch(onProfileFail);   // liff.init / liff.getProfile พัง
   // ── ONBOARD MODAL ─────────────────────────────
   window.openOnboard = function() {
     document.getElementById('onboardOverlay').style.display = 'flex';
