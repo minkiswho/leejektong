@@ -254,6 +254,9 @@
     }
     .branch-select:focus { border-color: var(--brand); }
     .branch-hint { font-size: 11px; color: var(--sub); margin-top: 6px; }
+    /* v19: สั่งแทนสาขาอื่น / ยังไม่เลือกสาขา → กรอบส้ม + ข้อความเตือน */
+    .branch-select.warn { border-color: #E67E22; background-color: #FEF5E7; }
+    .branch-hint.warn { color: #B9770E; font-weight: 700; }
 
     /* BOTTOM SPACER */
     .spacer-bottom { height: 160px; }
@@ -352,10 +355,21 @@
 
   // ── BRANCH DROPDOWN ──────────────────────────────
   // เติมรายชื่อสาขาลง dropdown + ตั้ง default = สาขาพนักงาน
+  // 🔴 v19 fix: เดิมถ้า getProfile พลาด (emp = null) dropdown จะเงียบๆ ตกไปตัวแรก = อมรินทร์ (id 1)
+  //   ขณะที่แถบบนยังโชว์สาขาจาก sessionStorage → พนักงานเห็น "ตรงสาขา" แต่ส่งเข้า 1
+  //   ตอนนี้: มีตัวเลือก "— เลือกสาขา —" อยู่บนสุด → ถ้าหา default ไม่เจอ จะค้างที่ตัวนี้ และปุ่มส่งจะบล็อก
+  var homeBranchId = null;   // สาขาประจำตัว (ใช้เตือนตอนสั่งแทนสาขาอื่น)
+  var branchNames = {};      // branch_id -> ชื่อ (ใช้บนปุ่มส่ง)
+
   function renderBranches(branches, defaultBranchId) {
     var sel = el('branchSelect');
     sel.innerHTML = '';
+    var ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = '— เลือกสาขา —';
+    sel.appendChild(ph);
     branches.forEach(function(b) {
+      branchNames[String(b.branch_id)] = b.branch_name;
       var o = document.createElement('option');
       o.value = b.branch_id;
       o.textContent = b.branch_name;
@@ -364,14 +378,35 @@
     // default = สาขาประจำตัว (ถ้ามี) — เปลี่ยนได้
     if (defaultBranchId) {
       sel.value = String(defaultBranchId);
+      if (sel.value !== String(defaultBranchId)) sel.value = '';   // ไม่ match → ค้างที่ placeholder
+    } else {
+      sel.value = '';
     }
+    homeBranchId = sel.value ? Number(sel.value) : null;
     selectedBranchId = Number(sel.value) || null;
 
     sel.addEventListener('change', function() {
       selectedBranchId = Number(sel.value) || null;
+      updateBranchWarn();
+      updateSubmitBtn();
     });
 
     el('branchSection').style.display = 'block';
+    updateBranchWarn();
+    updateSubmitBtn();
+  }
+
+  // เตือนเมื่อ ยังไม่เลือกสาขา หรือ สั่งให้สาขาที่ไม่ใช่สาขาตัวเอง
+  function updateBranchWarn() {
+    var sel = el('branchSelect'), hint = document.querySelector('.branch-hint');
+    var warn = false, msg = 'ค่าเริ่มต้น = สาขาของคุณ — เปลี่ยนได้ถ้าสั่งแทนสาขาอื่น';
+    if (!selectedBranchId) {
+      warn = true; msg = '⚠️ กรุณาเลือกสาขาที่จะสั่งให้';
+    } else if (homeBranchId && selectedBranchId !== homeBranchId) {
+      warn = true; msg = '⚠️ กำลังสั่งแทนสาขาอื่น (ไม่ใช่สาขาของคุณ)';
+    }
+    sel.classList.toggle('warn', warn);
+    if (hint) { hint.textContent = msg; hint.classList.toggle('warn', warn); }
   }
 
   // ── DELIVER DATE ─────────────────────────────────
@@ -464,7 +499,8 @@
       el('btnText').textContent = 'เลือกอย่างน้อย 1 รายการ';
     } else {
       btn.disabled = false;
-      el('btnText').textContent = '📨  ส่งคำสั่ง (' + count + ' รายการ)';
+      var bName = selectedBranchId ? (branchNames[String(selectedBranchId)] || '') : '';
+      el('btnText').textContent = '📨  ส่งคำสั่ง (' + count + ' รายการ)' + (bName ? ' → ' + bName : '');
     }
   }
 
@@ -627,8 +663,14 @@
       if (branch) { el('barBranch').textContent = branch; }
 
       // โหลดโปรไฟล์ก่อน (ต้องรู้ branch_id ของพนักงานก่อน เพื่อตั้ง default สาขา)
-      return callGAS({ action: 'getProfile' }).then(function(pData) {
-        if (pData.ok) {
+      // v19: getProfile พลาด → ลองซ้ำ 1 ครั้งก่อน (ช่วงคนสั่งพร้อมกันเที่ยง-บ่ายโมง)
+      var getProfileOnce = function() {
+        return callGAS({ action: 'getProfile' }).catch(function() { return { ok: false }; });
+      };
+      return getProfileOnce().then(function(p1) {
+        return (p1 && p1.ok) ? p1 : getProfileOnce();
+      }).then(function(pData) {
+        if (pData && pData.ok) {
           emp = pData.employee;
           // เติม name/branch ถ้ายังไม่มีใน session
           if (!name) {
@@ -651,7 +693,9 @@
 
       // เติม dropdown สาขา (default = สาขาพนักงาน)
       if (branchData && branchData.ok && branchData.branches && branchData.branches.length) {
-        renderBranches(branchData.branches, emp ? emp.branch_id : null);
+        // default = สาขาจากโปรไฟล์ → ถ้าไม่มี ใช้ที่หน้าแรกเก็บไว้ → ถ้าไม่มีอีก ปล่อยให้พนักงานเลือกเอง (ห้ามเดา)
+        var defId = (emp && emp.branch_id) || sessionStorage.getItem('lj_branch_id') || null;
+        renderBranches(branchData.branches, defId);
       }
 
       // เติมรายการสินค้า
