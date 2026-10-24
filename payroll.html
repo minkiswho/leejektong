@@ -281,6 +281,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
   // MANAGER — v18 ทำจ่าย (เลือกคน · เลือกรอบในการ์ด · กรอกยอดเอง)
   // ─────────────────────────────────────────────
   var curGroup = 'branch', curPeriod = '', curEmployees = [], curMeta = {}, curSearch = '';
+  var curSubmitId = null;   // v21: ใช้ id เดิมตอนกดใหม่ → backend ไม่เขียนซ้ำ
 
   function managerHome(nested){
     var target = nested ? 'adminBody' : 'app';
@@ -290,7 +291,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
 
   function loadRound(target){
     target = target || 'adminBody';
-    callGAS('createPayrollRound', { group: curGroup, period: curPeriod || undefined })
+    callGAS('createPayrollRound', { group: curGroup, period: curPeriod || undefined }, 120000)
       .then(function(res){
         if (!res.ok){
           document.getElementById(target).innerHTML =
@@ -505,15 +506,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
     if (warn.length && !confirm('มีรายการรอบนี้อยู่แล้ว: '+warn.join(', ')+'\nจ่ายซ้ำ?')) return;
 
     var btn = event.target; btn.disabled = true; btn.textContent = 'กำลังส่ง...';
-    callGAS('submitPayrollRound', { period: curPeriod, entries: entries }).then(function(res){
+    if (!curSubmitId) curSubmitId = 'S' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    callGAS('submitPayrollRound', { period: curPeriod, entries: entries, submit_id: curSubmitId }, 300000).then(function(res){
+      if (res.error === 'DUPLICATE_SUBMIT'){ curSubmitId = null; uncertain(res.message); return; }
       if (!res.ok){ toast(res.message||res.error); btn.disabled=false; btn.textContent='ส่งให้พนักงานกรอกบัญชี →'; return; }
+      curSubmitId = null;
       document.getElementById('mgrList').innerHTML =
         '<div class="banner ok"><span class="ic">✅</span><div>'+esc(res.message)+'</div></div>';
     }).catch(function(e){
-      btn.disabled=false; btn.textContent='ส่งให้พนักงานกรอกบัญชี →';
-      // ไม่รู้ว่าเข้าระบบแล้วหรือยัง → ห้ามกดซ้ำทันที (จะจ่ายซ้ำ)
-      toast('เชื่อมต่อไม่สำเร็จ ['+errText(e)+'] — เช็คแท็บ "สถานะ" ก่อนกดส่งใหม่');
+      // v21: ไม่รู้ว่าเข้าระบบแล้วหรือยัง → ห้ามเปิดปุ่มให้กดซ้ำ · โหลดสถานะใหม่ (แถบ "มีรายการแล้ว" จะขึ้นถ้าเข้าแล้ว)
+      uncertain('เชื่อมต่อไม่สำเร็จ ['+errText(e)+'] — ไม่แน่ใจว่าส่งสำเร็จหรือยัง');
     });
+    function uncertain(msg){
+      document.getElementById('mgrList').innerHTML =
+        '<div class="banner warn"><span class="ic">⚠️</span><div>'+esc(msg)+'<br>กำลังโหลดรายชื่อใหม่ — ดูป้าย "ปลายเดือน · sent_emp" ก่อนส่งอีกครั้ง</div></div>';
+      setTimeout(function(){ loadRound('adminBody'); }, 2500);
+    }
   }
 
   // ─────────────────────────────────────────────

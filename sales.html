@@ -166,10 +166,17 @@ function isoToLabel(iso){
   var a = String(iso).split('-');
   return Number(a[2]) + ' ' + TH_MONTH[Number(a[1]) - 1] + ' ' + (Number(a[0]) + 543);
 }
+var salesLate = false;
 function renderSalesDay(){
-  var sd = salesDay();
-  $("salesDay").innerText = sd.label;
-  $("salesDayNote").style.display = sd.late ? "block" : "none";
+  try {
+    var sd = salesDay();
+    salesLate = sd.late;
+    $("salesDay").innerText = sd.label;
+    $("salesDayNote").style.display = sd.late ? "block" : "none";
+  } catch (e) {
+    // webview เก่าไม่รองรับ Intl timeZone → ไม่โชว์กล่องวันที่ (backend ยังตัดสินวันที่ถูกเอง)
+    var c = document.querySelector(".day-card"); if (c) c.style.display = "none";
+  }
 }
 
 // POST text/plain กัน CORS preflight (ตาม decision ที่ lock) · v21: หมดเวลา 30 วิ ไม่ค้าง
@@ -267,6 +274,8 @@ function submitSales(){
       showMsg("ok", "✓ ส่งยอดสำเร็จ\n" + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท"
         + (res.date ? "\nยอดของวันที่ " + isoToLabel(res.date) : ""));
       $("form").style.display = "none";
+      // v21: ส่งหลังเที่ยงคืน → ไม่ชวนเช็คเอาต์ (หน้าเช็คอินนับเป็นวันใหม่แล้ว กดพลาด = เช็คอินวันใหม่)
+      $("after").querySelector(".go").style.display = salesLate ? "none" : "block";
       $("after").style.display = "block";
       return;
     }
