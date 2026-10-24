@@ -207,6 +207,25 @@
     .leave-skel { padding: 4px 16px 14px; }
     .leave-skel .ls-row { height: 14px; margin: 12px 0; }
 
+    /* ── v21: ปุ่มใช้ทุกวัน (บนสุด) ───────────────── */
+    .quick-wrap { padding: 14px 16px 0; }
+    .quick-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .quick-grid .action-btn { padding: 14px 6px 12px; gap: 7px; }
+    .quick-grid .action-btn .btn-icon { width: 48px; height: 48px; font-size: 24px; border-radius: 14px; }
+    .quick-grid .action-btn .btn-label { font-size: 13.5px; }
+    .quick-grid .action-btn .btn-sub { display: none; }
+    /* ── v21: แถบเตือน (ย่อ) ───────────────────────── */
+    .warn-strip {
+      display: flex; align-items: center; gap: 8px; width: 100%;
+      background: #FDECEA; color: var(--brand); border: 1px solid #F3D6D2;
+      border-radius: 14px; padding: 11px 14px; font-family: inherit;
+      font-size: 13px; font-weight: 700; text-align: left; cursor: pointer;
+    }
+    .warn-strip .ws-text { flex: 1; min-width: 0; }
+    .warn-strip .ws-arrow { flex-shrink: 0; font-size: 12px; opacity: .8; }
+    .warn-card.collapsed { display: none; }
+    .warn-card { margin-top: 8px; }
+
     /* ── SECTION ─────────────────────────────────── */
     .section { padding: 18px 16px 0; }
     .section-label {
@@ -419,9 +438,33 @@
   </div>
 </div>
 
+<!-- v21: ปุ่มใช้ทุกวัน — บนสุด ไม่ต้องเลื่อน -->
+<div class="quick-wrap">
+  <div class="quick-grid">
+    <a class="action-btn btn-checkin" href="checkin.html" id="btnCheckin">
+      <div class="btn-icon">🕐</div>
+      <div class="btn-label">เช็คอิน<br>/ เช็คเอาท์</div>
+      <div class="btn-sub">บันทึกเวลาเข้า–ออก</div>
+    </a>
+    <a class="action-btn btn-order" href="order.html" id="btnOrder">
+      <div class="btn-icon">📦</div>
+      <div class="btn-label">สั่งวัตถุดิบ</div>
+      <div class="btn-sub">ขอเบิกของจากครัวกลาง</div>
+    </a>
+    <a class="action-btn btn-sales" href="sales.html" id="btnSales">
+      <div class="btn-icon">💰</div>
+      <div class="btn-label">ส่งยอดขาย</div>
+      <div class="btn-sub">ลงยอดขายรายวัน</div>
+    </a>
+  </div>
+</div>
+
 <!-- WARNING (v14 — ขาดส่งยอด / ไม่เช็คอิน) : ซ่อนไว้ ถ้าไม่มีอะไรค้างจะไม่โผล่เลย -->
 <div class="warn-wrap" id="warnWrap" style="display:none">
-  <div class="warn-card">
+  <button class="warn-strip" id="warnStrip" onclick="toggleWarn()">
+    <span>⚠️</span><span class="ws-text" id="warnStripText">เตือน</span><span class="ws-arrow" id="warnArrow">ดู ▸</span>
+  </button>
+  <div class="warn-card collapsed" id="warnCard">
     <div class="warn-head">
       <div class="wh-icon">⚠️</div>
       <div>
@@ -459,23 +502,8 @@
 
 <!-- PHASE 1 ACTIONS -->
 <div class="section">
-  <div class="section-label">เมนูหลัก</div>
+  <div class="section-label">เมนูอื่น</div>
   <div class="actions-grid">
-    <a class="action-btn btn-checkin" href="checkin.html" id="btnCheckin">
-      <div class="btn-icon">🕐</div>
-      <div class="btn-label">เช็คอิน<br>/ เช็คเอาท์</div>
-      <div class="btn-sub">บันทึกเวลาเข้า–ออก</div>
-    </a>
-    <a class="action-btn btn-order" href="order.html" id="btnOrder">
-      <div class="btn-icon">📦</div>
-      <div class="btn-label">สั่งวัตถุดิบ</div>
-      <div class="btn-sub">ขอเบิกของจากครัวกลาง</div>
-    </a>
-    <a class="action-btn btn-sales" href="sales.html" id="btnSales">
-      <div class="btn-icon">💰</div>
-      <div class="btn-label">ส่งยอดขาย</div>
-      <div class="btn-sub">ลงยอดขายรายวัน</div>
-    </a>
     <a class="action-btn btn-expense" href="expense.html" id="btnExpense">
       <div class="btn-icon">🧾</div>
       <div class="btn-label">เบิกเงิน</div>
@@ -636,8 +664,16 @@
             + '</div>';
     }
     document.getElementById('warnList').innerHTML = html;
+    // v21: ย่อเป็นแถบ 1 บรรทัด — แตะเพื่อดูรายวัน
+    document.getElementById('warnStripText').textContent =
+      rows.map(function(r){ return r.label.replace(/^\S+\s/, '') + ' ' + r.count + ' วัน'; }).join(' · ');
     document.getElementById('warnWrap').style.display = 'block';
   }
+  window.toggleWarn = function() {
+    var c = document.getElementById('warnCard');
+    var open = c.classList.toggle('collapsed') === false;
+    document.getElementById('warnArrow').textContent = open ? 'ซ่อน ▾' : 'ดู ▸';
+  };
 
   function loadMyWarnings() {
     callGAS('getMyWarnings')
@@ -659,9 +695,11 @@
     skel.style.display = 'none';
 
     if (!leaves || leaves.length === 0) {
-      empty.style.display = 'block';
+      // v21: ไม่มีวันหยุด → ซ่อนการ์ดทั้งใบ (ไม่ดันเมนูลง)
+      document.getElementById('leaveWrap').style.display = 'none';
       return;
     }
+    document.getElementById('leaveWrap').style.display = 'block';
 
     var html = '';
     for (var i = 0; i < leaves.length; i++) {
@@ -678,7 +716,7 @@
   }
 
   function loadMyLeaves() {
-    document.getElementById('leaveWrap').style.display = 'block';
+    // v21: ยังไม่โชว์การ์ดจนกว่าจะรู้ว่ามีวันหยุด (กันการ์ดว่างโผล่แล้วหาย)
     callGAS('getMyLeaves')
       .then(function(data) {
         if (data && data.ok) {

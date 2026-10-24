@@ -25,21 +25,52 @@
   .msg.err { background:#fdecec; color:#b32020; display:block; }
   .hint { font-size:12px; color:var(--mute); margin-top:6px; }
   .center { text-align:center; color:var(--mute); padding:40px 0; }
+  /* v21 */
+  .home-link { display:inline-block; font-size:14px; font-weight:600; color:#05a948; text-decoration:none; padding:4px 0; }
+  .quick { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:10px; }
+  .quick button { margin:0; padding:11px 0; font-size:15px; background:#fff; color:var(--ink); border:1.5px solid var(--line); border-radius:10px; font-weight:700; }
+  .quick button:active { background:#eef8f1; }
+  .cf-overlay { position:fixed; inset:0; background:rgba(26,26,26,.55); display:none; align-items:flex-start; justify-content:center; padding:14vh 20px 0; z-index:50; }
+  .cf-box { background:#fff; border-radius:18px; padding:22px 18px 14px; width:100%; max-width:360px; text-align:center; }
+  .cf-k { font-size:14px; color:var(--mute); }
+  .cf-amt { font-size:40px; font-weight:800; margin:4px 0 2px; letter-spacing:.5px; }
+  .cf-words { font-size:14px; color:var(--mute); margin-bottom:6px; }
+  .cf-reason { font-size:14px; margin-bottom:6px; word-break:break-word; }
+  .cf-box .ghost { background:transparent; color:var(--mute); margin-top:4px; }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <a class="home-link" href="index.html">‹ หน้าแรก</a>
   <h1>เบิกเงินล่วงหน้า</h1>
   <div id="loading" class="center">กำลังโหลด…</div>
 
   <div id="form" class="card" style="display:none;">
     <label>จำนวนเงิน (บาท)</label>
-    <input id="amount" class="amt" type="number" inputmode="numeric" min="1" placeholder="0">
-    <label>เหตุผล</label>
-    <textarea id="reason" placeholder="ระบุเหตุผลการเบิก"></textarea>
+    <input id="amount" class="amt" type="text" inputmode="numeric" autocomplete="off" placeholder="0">
+    <div class="quick">
+      <button type="button" data-v="500">500</button>
+      <button type="button" data-v="1000">1,000</button>
+      <button type="button" data-v="2000">2,000</button>
+      <button type="button" data-v="3000">3,000</button>
+    </div>
+    <label>เหตุผล (ไม่บังคับ)</label>
+    <textarea id="reason" placeholder="เว้นว่างได้"></textarea>
     <div class="hint">* ส่งได้ครั้งละ 1 คำขอ ต้องรอผลก่อนส่งใหม่</div>
     <button id="submit">ส่งคำขอ</button>
     <div id="msg" class="msg"></div>
+  </div>
+</div>
+
+<!-- v21: ยืนยันยอดตัวใหญ่ก่อนส่ง (เคยพิมพ์ 300 แทน 3,000) -->
+<div class="cf-overlay" id="cf">
+  <div class="cf-box">
+    <div class="cf-k">ยืนยันขอเบิก</div>
+    <div class="cf-amt" id="cfAmt">0</div>
+    <div class="cf-words">บาท</div>
+    <div class="cf-reason" id="cfReason"></div>
+    <button id="cfOk">ยืนยัน ส่งคำขอ</button>
+    <button class="ghost" id="cfNo" type="button">แก้ไขยอด</button>
   </div>
 </div>
 
@@ -70,15 +101,42 @@
     }
   }
 
-  async function submit(){
-    var amount = Number($("amount").value);
-    var reason = $("reason").value.trim();
-    if (!(amount >= 1)) { showMsg("กรุณากรอกจำนวนเงิน", false); return; }
-    if (!reason) { showMsg("กรุณาระบุเหตุผล", false); return; }
+  // v21: ใส่ลูกน้ำขณะพิมพ์
+  function amountValue(){ return Number(String($("amount").value).replace(/[^0-9]/g, "")) || 0; }
+  function setAmount(n){ $("amount").value = n ? Number(n).toLocaleString("en-US") : ""; }
+  $("amount").addEventListener("input", function(){
+    var raw = String($("amount").value).replace(/[^0-9]/g, "").slice(0, 6);
+    setAmount(raw ? Number(raw) : 0);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".quick button"), function(b){
+    b.addEventListener("click", function(){ setAmount(Number(b.getAttribute("data-v"))); });
+  });
 
+  var ERR_TH = {
+    HAS_PENDING: "มีคำขอที่รออนุมัติอยู่ — รอผลก่อนส่งใหม่",
+    USER_NOT_FOUND: "ไม่พบบัญชีพนักงานในระบบ ติดต่อมิ้งค์",
+    BAD_AMOUNT: "จำนวนเงินไม่ถูกต้อง"
+  };
+
+  function submit(){
+    var amount = amountValue();
+    if (!(amount >= 1)) { showMsg("กรุณากรอกจำนวนเงิน", false); return; }
+    $("cfAmt").textContent = amount.toLocaleString("en-US");
+    var reason = $("reason").value.trim();
+    $("cfReason").textContent = reason ? ("เหตุผล: " + reason) : "";
+    $("cf").style.display = "flex";
+  }
+  $("cfNo").addEventListener("click", function(){ $("cf").style.display = "none"; $("amount").focus(); });
+  $("cfOk").addEventListener("click", function(){ $("cf").style.display = "none"; send(); });
+
+  async function send(){
+    var amount = amountValue();
+    var reason = $("reason").value.trim();
     var btn = $("submit");
     btn.disabled = true; btn.textContent = "กำลังส่ง…";
     try {
+      var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+      var t = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 30000);
       var res = await fetch(GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
@@ -88,17 +146,20 @@
           userId: USER_ID,
           amount: amount,
           reason: reason
-        })
+        }),
+        signal: ctrl ? ctrl.signal : undefined
       });
+      clearTimeout(t);
       var data = await res.json();
       if (data.ok) {
         showMsg("✅ " + (data.message || "ส่งคำขอแล้ว รอการอนุมัติ"), true);
         $("amount").value = ""; $("reason").value = "";
       } else {
-        showMsg("❌ " + (data.message || data.error || "ส่งไม่สำเร็จ"), false);
+        showMsg("❌ " + (ERR_TH[data.error] || data.message || data.error || "ส่งไม่สำเร็จ"), false);
       }
     } catch (e) {
-      showMsg("❌ เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง", false);
+      var d = (e && e.name === "AbortError") ? "หมดเวลา" : (e && e.message ? e.message : e);
+      showMsg("❌ เชื่อมต่อไม่สำเร็จ [" + d + "] — ถ้ากดใหม่แล้วขึ้น 'รออนุมัติอยู่' แปลว่าส่งไปแล้ว", false);
     } finally {
       btn.disabled = false; btn.textContent = "ส่งคำขอ";
     }

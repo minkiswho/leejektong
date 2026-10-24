@@ -142,6 +142,14 @@
       min-width: 32px; text-align: center;
       font-size: 15px; font-weight: 700;
     }
+    /* v21: แตะตัวเลขแล้วพิมพ์จำนวนได้ */
+    input.qty-num {
+      width: 46px; height: 32px; margin: 0 4px; padding: 0;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      background: #fff; color: var(--text); font-family: inherit;
+      -webkit-appearance: none; appearance: none;
+    }
+    input.qty-num:focus { outline: none; border-color: var(--brand); }
 
     /* ORDER SUMMARY FOOTER */
     .order-footer {
@@ -272,7 +280,7 @@
 
 <!-- HEADER -->
 <div class="header">
-  <button class="back-btn" onclick="history.back()">←</button>
+  <button class="back-btn" onclick="location.href='index.html'" aria-label="กลับหน้าแรก">←</button>
   <div class="header-text">
     <h1>สั่งวัตถุดิบ</h1>
     <p id="headerBranch">โหลด...</p>
@@ -535,7 +543,8 @@
           '<span class="item-name">' + esc(item.item_name) + '</span>' +
           '<div class="qty-ctrl">' +
             '<button class="qty-btn minus" data-id="' + id + '" onclick="changeQty(' + id + ',-1)">−</button>' +
-            '<span class="qty-num" id="qty-' + id + '">0</span>' +
+            '<input class="qty-num" id="qty-' + id + '" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="0" ' +
+              'onfocus="this.select()" oninput="typeQty(' + id + ',this)" onblur="blurQty(' + id + ',this)">' +
             '<button class="qty-btn plus" data-id="' + id + '" onclick="changeQty(' + id + ',1)">+</button>' +
           '</div>';
         section.appendChild(row);
@@ -550,9 +559,8 @@
   }
 
   // ── QTY CHANGE (global เพื่อใช้ inline onclick) ──
-  window.changeQty = function(itemId, delta) {
-    qty[itemId] = Math.max(0, Math.min(50, (qty[itemId] || 0) + delta));
-    el('qty-' + itemId).textContent = qty[itemId] || '0';
+  var QTY_MAX = 50;   // Decision LOCK v18: สูงสุด 50 ต่อรายการ
+  function paintQty(itemId) {
     var row = el('row-' + itemId);
     if (qty[itemId] > 0) {
       row.classList.add('has-qty');
@@ -561,7 +569,21 @@
     }
     updateCartBadge();
     updateSubmitBtn();
+  }
+  window.changeQty = function(itemId, delta) {
+    qty[itemId] = Math.max(0, Math.min(QTY_MAX, (qty[itemId] || 0) + delta));
+    el('qty-' + itemId).value = qty[itemId] || 0;
+    paintQty(itemId);
   };
+  // v21: พิมพ์จำนวนตรง ๆ (แป้นตัวเลข) — เดิมกดได้ทีละ 1 ไข่ต้ม 50 = กด 50 ครั้ง
+  window.typeQty = function(itemId, input) {
+    var digits = String(input.value).replace(/[^0-9]/g, '');
+    var n = digits === '' ? 0 : Math.min(QTY_MAX, Number(digits));
+    qty[itemId] = n;
+    if (digits !== '' && String(n) !== input.value) input.value = n;   // ตัดของแปลก / เกิน 50
+    paintQty(itemId);
+  };
+  window.blurQty = function(itemId, input) { input.value = qty[itemId] || 0; };   // ช่องว่าง/ตัวอักษร → 0
 
   // ── SUBMIT ───────────────────────────────────────
   el('submitBtn').addEventListener('click', function() {
@@ -634,7 +656,7 @@
     Object.keys(qty).forEach(function(k){
       qty[k] = 0;
       var qEl = el('qty-' + k);
-      if (qEl) qEl.textContent = '0';
+      if (qEl) qEl.value = 0;
       var rEl = el('row-' + k);
       if (rEl) rEl.classList.remove('has-qty');
     });

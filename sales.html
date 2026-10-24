@@ -59,10 +59,21 @@
   .who{font-size:13px;color:var(--muted);margin-bottom:16px}
   .who b{color:var(--ink);font-weight:600}
   #form{display:none}
+  /* v21 */
+  .home-link{display:inline-block;font-size:14px;font-weight:600;color:var(--green-dark);text-decoration:none;margin:0 0 10px;padding:4px 0}
+  .day-card{background:#fff;border:2px solid var(--green);border-radius:14px;padding:14px 16px;margin-bottom:14px;text-align:center}
+  .day-card .k{font-size:13px;color:var(--muted)}
+  .day-card .v{font-size:26px;font-weight:800;margin-top:2px;letter-spacing:.2px}
+  .day-card .n{font-size:12.5px;color:var(--amber);margin-top:4px;font-weight:600}
+  .after{display:none;margin-bottom:14px}
+  .after a{display:block;text-align:center;text-decoration:none;font-size:17px;font-weight:700;border-radius:12px;padding:15px;margin-top:10px}
+  .after .go{background:var(--green);color:#fff}
+  .after .home{background:#fff;color:var(--ink);border:1px solid var(--line)}
 </style>
 </head>
 <body>
 <div class="wrap">
+  <a class="home-link" href="index.html">‹ หน้าแรก</a>
   <h1>ส่งยอดขายรายวัน</h1>
   <p class="sub" id="dateLabel">—</p>
 
@@ -70,7 +81,19 @@
 
   <div id="msg" class="msg"></div>
 
+  <!-- v21: หลังส่งสำเร็จ -->
+  <div class="after" id="after">
+    <a class="go" href="checkin.html">🕐 เช็คเอาต์เลย →</a>
+    <a class="home" href="index.html">กลับหน้าแรก</a>
+  </div>
+
   <div id="form">
+    <!-- v21: วันที่ของยอด ตัวใหญ่ (ส่งหลังเที่ยงคืน = เมื่อวาน) -->
+    <div class="day-card">
+      <div class="k">ยอดของวันที่</div>
+      <div class="v" id="salesDay">—</div>
+      <div class="n" id="salesDayNote" style="display:none">ส่งหลังเที่ยงคืน → นับเป็นยอดของเมื่อวาน</div>
+    </div>
     <p class="who" id="who"></p>
 
     <div class="card">
@@ -123,13 +146,43 @@ function thaiDate(){
   return dd + "/" + mm + "/" + yy;
 }
 
-// POST text/plain กัน CORS preflight (ตาม decision ที่ lock)
+// v21: วันที่ของยอด — ก่อน 05:00 = เมื่อวาน (ต้องตรงกับ SALES_CUTOFF_HOUR ใน DailySales.gs · backend เป็นตัวตัดสินจริง)
+var SALES_CUTOFF_HOUR = 5;
+var TH_MONTH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function bkkParts(d){
+  var o = {};
+  new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',hourCycle:'h23'})
+    .formatToParts(d).forEach(function(p){ o[p.type] = Number(p.value); });
+  return o;
+}
+function salesDay(){
+  var now = new Date();
+  var p = bkkParts(now);
+  var late = p.hour < SALES_CUTOFF_HOUR;
+  if (late) p = bkkParts(new Date(now.getTime() - (p.hour + 1) * 3600 * 1000));   // ถอยไปเมื่อวาน
+  return { label: p.day + ' ' + TH_MONTH[p.month - 1] + ' ' + (p.year + 543), late: late };
+}
+function isoToLabel(iso){
+  var a = String(iso).split('-');
+  return Number(a[2]) + ' ' + TH_MONTH[Number(a[1]) - 1] + ' ' + (Number(a[0]) + 543);
+}
+function renderSalesDay(){
+  var sd = salesDay();
+  $("salesDay").innerText = sd.label;
+  $("salesDayNote").style.display = sd.late ? "block" : "none";
+}
+
+// POST text/plain กัน CORS preflight (ตาม decision ที่ lock) · v21: หมดเวลา 30 วิ ไม่ค้าง
 function post(payload){
-  return fetch(GAS_URL, {
+  var ms = 30000, timer;
+  var timeout = new Promise(function(_, rej){ timer = setTimeout(function(){ rej(new Error("หมดเวลา 30 วิ")); }, ms); });
+  var req = fetch(GAS_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(payload)
   }).then(function(r){ return r.json(); });
+  return Promise.race([req, timeout]).then(function(v){ clearTimeout(timer); return v; },
+                                            function(e){ clearTimeout(timer); throw e; });
 }
 
 // ===== amount: format มี comma ขณะพิมพ์ =====
@@ -144,6 +197,7 @@ function amountValue(){
 
 // ===== boot =====
 $("dateLabel").innerText = "วันที่ " + thaiDate();
+renderSalesDay();
 
 liff.init({ liffId: LIFF_ID }).then(function(){
   // ถ้าเปิดนอก LINE (เช่น Safari) → ยังไม่ login → เด้ง login ก่อน
@@ -203,20 +257,23 @@ function submitSales(){
   var btn = $("btn");
   btn.disabled = true;
   btn.innerText = "กำลังส่ง...";
+  renderSalesDay();   // เผื่อเปิดหน้าทิ้งไว้ข้ามเที่ยงคืน/ตี 5
 
   post({
     token: SHARED_SECRET, userId: uid, action: "dailySales",
     branch_id: branch_id, amount: amount, note: $("note").value.trim()
   }).then(function(res){
     if(res.ok){
-      showMsg("ok", "✓ ส่งยอดสำเร็จ\n" + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท");
+      showMsg("ok", "✓ ส่งยอดสำเร็จ\n" + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท"
+        + (res.date ? "\nยอดของวันที่ " + isoToLabel(res.date) : ""));
       $("form").style.display = "none";
+      $("after").style.display = "block";
       return;
     }
     btn.disabled = false;
     btn.innerText = "ส่งยอดขาย";
     if(res.error === "ALREADY_SUBMITTED"){
-      showMsg("warn", "สาขานี้ลงยอดวันนี้แล้ว: " + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท");
+      showMsg("warn", "สาขานี้ลงยอด" + (res.date ? "ของวันที่ " + isoToLabel(res.date) : "วันนี้") + "แล้ว: " + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท");
     } else if(res.error === "INVALID_AMOUNT"){
       showMsg("warn", "ยอดไม่ถูกต้อง ต้องอย่างน้อย 1 บาท");
     } else if(res.error === "BRANCH_NOT_FOUND"){
@@ -227,7 +284,7 @@ function submitSales(){
   }).catch(function(e){
     btn.disabled = false;
     btn.innerText = "ส่งยอดขาย";
-    showMsg("err", "เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง");
+    showMsg("err", "เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง\n[" + (e && e.message ? e.message : e) + "]");
   });
 }
 </script>

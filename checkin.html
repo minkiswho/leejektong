@@ -164,6 +164,17 @@
       background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px;
     }
     @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    /* v21: ยืนยันเช็คเอาท์ (custom — ไม่ใช้ JS confirm) · กล่องอยู่ด้านบน ห่างจากปุ่มหลัก กันนิ้วกดซ้ำโดน */
+    .cf-overlay { position: fixed; inset: 0; background: rgba(31,39,51,.55); display: none;
+      align-items: flex-start; justify-content: center; padding: 14vh 20px 0; z-index: 300; }
+    .cf-box { background: #fff; border-radius: 20px; padding: 22px 20px 16px; width: 100%; max-width: 360px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.25); text-align: center; }
+    .cf-title { font-size: 18px; font-weight: 800; }
+    .cf-sub { font-size: 14px; color: #8794A3; margin: 6px 0 16px; }
+    .cf-ok { width: 100%; border: none; border-radius: 14px; padding: 15px; font-size: 16px; font-weight: 800;
+      color: #fff; background: #C0392B; font-family: inherit; }
+    .cf-cancel { width: 100%; border: none; background: transparent; padding: 12px; margin-top: 6px;
+      font-size: 15px; color: #8794A3; font-weight: 600; font-family: inherit; }
   </style>
 </head>
 <body>
@@ -176,7 +187,7 @@
 
 <!-- HEADER -->
 <div class="header">
-  <button class="back-btn" onclick="history.back()">←</button>
+  <button class="back-btn" onclick="location.href='index.html'" aria-label="กลับหน้าแรก">←</button>
   <div class="header-title">
     <h1>เช็คอิน / เช็คเอาท์</h1>
     <p id="todayDate">โหลด...</p>
@@ -224,6 +235,16 @@
   </button>
 </div>
 
+<!-- v21: CONFIRM CHECKOUT -->
+<div class="cf-overlay" id="cfOverlay">
+  <div class="cf-box">
+    <div class="cf-title">ยืนยันเช็คเอาท์?</div>
+    <div class="cf-sub" id="cfSub"></div>
+    <button class="cf-ok" id="cfOk">👋 ยืนยันเช็คเอาท์</button>
+    <button class="cf-cancel" id="cfCancel">ยกเลิก</button>
+  </div>
+</div>
+
 <!-- RESULT -->
 <div class="result-card" id="resultCard">
   <div class="result-title" id="resultTitle"></div>
@@ -236,6 +257,8 @@
   var gpsCoords = null;  // { lat, lng }
   var currentState = null; // 'none' | 'in' | 'done'
   var gpsReady = false;
+  var lockUntil = 0;     // v21: หลังเช็คอินสำเร็จ ปุ่มเช็คเอาท์ยังกดไม่ได้ช่วงสั้น ๆ (กันกดเบิ้ล)
+  var LOCK_MS = 5000;
 
   // ── HELPERS ─────────────────────────────────────
   function todayThai() {
@@ -254,11 +277,15 @@
   function el(id) { return document.getElementById(id); }
 
   function callGAS(body) {
-    return fetch(WEB_APP_URL, {
+    var timer;   // v21: หมดเวลา 30 วิ ไม่ค้าง spinner
+    var timeout = new Promise(function(_, rej){ timer = setTimeout(function(){ rej(new Error('หมดเวลา 30 วิ')); }, 30000); });
+    var req = fetch(WEB_APP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(Object.assign({ token: SHARED_SECRET, userId: uid }, body))
     }).then(function(r){ return r.json(); });
+    return Promise.race([req, timeout]).then(function(v){ clearTimeout(timer); return v; },
+                                              function(e){ clearTimeout(timer); throw e; });
   }
 
   // ── GPS ─────────────────────────────────────────
@@ -322,9 +349,32 @@
 
     noteWrap.style.display = 'block';
     var isCheckin = (currentState === 'none');
+    if (!isCheckin && Date.now() < lockUntil) {
+      // เพิ่งเช็คอิน — ยังไม่โชว์เป็นปุ่มเช็คเอาท์ที่ตำแหน่งเดิมทันที
+      btn.className = 'action-btn done-mode';
+      btn.disabled = true;
+      el('btnText').textContent = '✅ เช็คอินแล้ว';
+      noteWrap.style.display = 'none';
+      setTimeout(updateBtnState, lockUntil - Date.now() + 50);
+      return;
+    }
     btn.className = 'action-btn ' + (isCheckin ? 'checkin-mode' : 'checkout-mode');
     el('btnText').textContent = isCheckin ? '📍  เช็คอิน' : '👋  เช็คเอาท์';
     btn.disabled = !gpsReady;
+  }
+
+  // ── v21: CONFIRM CHECKOUT ────────────────────────
+  var cfOpenedAt = 0;
+  function askCheckout(onYes) {
+    el('cfSub').textContent = 'เวลา ' + nowTime() + ' น. · บันทึกแล้วแก้ไม่ได้';
+    el('cfOverlay').style.display = 'flex';
+    cfOpenedAt = Date.now();
+    el('cfOk').onclick = function() {
+      if (Date.now() - cfOpenedAt < 400) return;   // กันแตะเดียวทะลุ 2 ชั้น
+      el('cfOverlay').style.display = 'none';
+      onYes();
+    };
+    el('cfCancel').onclick = function() { el('cfOverlay').style.display = 'none'; };
   }
 
   // ── ACTION BUTTON CLICK ──────────────────────────
@@ -334,7 +384,14 @@
       return;
     }
 
+    if (currentState === 'done') return;
+    if (currentState === 'in' && Date.now() < lockUntil) return;
     var action = (currentState === 'none') ? 'checkin' : 'checkout';
+    if (action === 'checkout') { askCheckout(function(){ send('checkout'); }); return; }
+    send('checkin');
+  });
+
+  function send(action) {
     var note   = el('noteInput').value.trim();
 
     setLoading(true);
@@ -355,6 +412,7 @@
         );
         // อัปเดต state
         if (data.type === 'checkin') {
+          lockUntil = Date.now() + LOCK_MS;
           setStatus('in', '🟢', 'เช็คอินแล้ว', 'เข้างาน ' + data.time + ' น.');
         } else {
           setStatus('done', '✔️', 'เสร็จสิ้นวันนี้', 'เข้า / ออก บันทึกครบแล้ว');
@@ -367,9 +425,10 @@
     })
     .catch(function(e) {
       setLoading(false);
-      showResult('fail', '❌ เชื่อมต่อไม่ได้', 'กรุณาลองใหม่อีกครั้ง');
+      updateBtnState();
+      showResult('fail', '❌ เชื่อมต่อไม่ได้', 'กรุณาลองใหม่อีกครั้ง [' + (e && e.message ? e.message : e) + ']');
     });
-  });
+  }
 
   function handleError(code) {
     var msgs = {
