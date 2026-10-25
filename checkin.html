@@ -409,6 +409,17 @@
     }
     el('cfOverlay').style.display = 'flex';
     cfOpenedAt = Date.now();
+    // v22: เช็คสถานะส่งยอดใหม่ตอนเปิดกล่อง (เปิดหน้าไว้ก่อน 17:00 / เพิ่งกลับจากหน้าส่งยอด)
+    callGAS({ action: 'getTodayStatus' }).then(function(d) {
+      if (!d || !d.ok || el('cfOverlay').style.display === 'none') return;
+      todayStatus = d;
+      if (d.sales_missing) {
+        el('cfWarnText').textContent = '⚠️ ' + (d.sales_branch_name || 'สาขานี้') + ' ยังไม่มีใครส่งยอดวันนี้';
+        el('cfWarn').style.display = 'block';
+      } else {
+        el('cfWarn').style.display = 'none';
+      }
+    }).catch(function(){});
     el('cfOk').onclick = function() {
       if (Date.now() - cfOpenedAt < 400) return;   // กันแตะเดียวทะลุ 2 ชั้น
       el('cfOverlay').style.display = 'none';

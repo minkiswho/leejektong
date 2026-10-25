@@ -290,7 +290,10 @@ function offerEdit(branchId, oldAmt, newAmt, info){
         b.disabled = false; b.innerText = "✏️ แก้เป็นยอดใหม่";
         if(r.ok){
           $("editBox").style.display = "none";
-          showMsg("ok", "✓ แก้ยอดแล้ว\n" + r.branch_name + " : " + Number(r.old_amount).toLocaleString("en-US") + " → " + Number(r.amount).toLocaleString("en-US") + " บาท\nยอดของวันที่ " + isoToLabel(r.date));
+          showMsg("ok", (r.unchanged
+            ? "✓ ยอดเป็น " + Number(r.amount).toLocaleString("en-US") + " บาทแล้ว (" + r.branch_name + ")"
+            : "✓ แก้ยอดแล้ว\n" + r.branch_name + " : " + Number(r.old_amount).toLocaleString("en-US") + " → " + Number(r.amount).toLocaleString("en-US") + " บาท")
+            + "\nยอดของวันที่ " + isoToLabel(r.date));
           $("form").style.display = "none";
           $("after").querySelector(".go").style.display = salesLate ? "none" : "block";
           $("after").style.display = "block";

@@ -425,7 +425,8 @@
     } else {
       sel.value = '';
     }
-    homeBranchId = sel.value ? Number(sel.value) : null;
+    // v22: สาขาประจำจริง (ไม่ใช่สาขาที่ GPS เลือก) — ใช้เตือนตอนสั่งให้สาขาที่ไม่ใช่ทั้งสาขาประจำและสาขาวันนี้
+    homeBranchId = (emp && emp.branch_id) ? Number(emp.branch_id) : (sel.value ? Number(sel.value) : null);
     selectedBranchId = Number(sel.value) || null;
 
     sel.addEventListener('change', function() {
@@ -443,13 +444,15 @@
   // เตือนเมื่อ ยังไม่เลือกสาขา หรือ สั่งให้สาขาที่ไม่ใช่สาขาตัวเอง
   function updateBranchWarn() {
     var sel = el('branchSelect'), hint = document.querySelector('.branch-hint');
-    var warn = false, msg = (todayBranchId && homeBranchId === todayBranchId)
+    var warn = false, msg = (todayBranchId && selectedBranchId === todayBranchId)
       ? 'ค่าเริ่มต้น = สาขาที่คุณเช็คอินวันนี้ — เปลี่ยนได้ถ้าสั่งแทนสาขาอื่น'
       : 'ค่าเริ่มต้น = สาขาของคุณ — เปลี่ยนได้ถ้าสั่งแทนสาขาอื่น';
     if (!selectedBranchId) {
       warn = true; msg = '⚠️ กรุณาเลือกสาขาที่จะสั่งให้';
-    } else if (homeBranchId && selectedBranchId !== homeBranchId) {
+    } else if (homeBranchId && selectedBranchId !== homeBranchId && selectedBranchId !== todayBranchId) {
       warn = true; msg = '⚠️ กำลังสั่งแทนสาขาอื่น (ไม่ใช่สาขาของคุณ)';
+    } else if (homeBranchId && selectedBranchId === todayBranchId && todayBranchId !== homeBranchId) {
+      warn = true; msg = '⚠️ สั่งให้ ' + (branchNames[String(selectedBranchId)] || '') + ' (สาขาที่เช็คอินวันนี้ ไม่ใช่สาขาประจำ) — ถ้าผิด เปลี่ยนได้';
     }
     sel.classList.toggle('warn', warn);
     if (hint) { hint.textContent = msg; hint.classList.toggle('warn', warn); }
