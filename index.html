@@ -391,6 +391,17 @@
       font-size: 13px; color: #8D6E28; line-height: 1.5;
       margin-top: 14px; text-align: center;
     }
+    /* v22: ฟอร์มลงทะเบียน */
+    .ob-input { width: 100%; font-family: inherit; font-size: 16px; padding: 12px 14px;
+      border: 1.5px solid var(--border); border-radius: 10px; background: #fff; color: var(--text);
+      -webkit-appearance: none; appearance: none; }
+    .ob-input:focus { outline: none; border-color: var(--brand); }
+    .ob-msg { display: none; border-radius: 10px; padding: 11px 13px; font-size: 13px; line-height: 1.5; margin: 10px 0 4px; }
+    .ob-msg.ok { display: block; background: #E8F5E9; color: var(--success); }
+    .ob-msg.err { display: block; background: #FDECEA; color: #922B21; }
+    .ob-msg.wait { display: block; background: #FEF5E7; color: #8D6E28; }
+    .ob-uid-line { font-size: 11px; color: var(--sub); margin-top: 12px; word-break: break-all; text-align: center; }
+    .btn-approvereg .btn-icon { background: #E7F5EC; }
     .ob-close-btn {
       width: 100%; padding: 12px;
       background: transparent; color: var(--sub);
@@ -539,6 +550,11 @@
       <div class="btn-label">จัดของ</div>
       <div class="btn-sub">จัดของส่งทุกสาขา</div>
     </a>
+    <a class="action-btn btn-approvereg" href="approveregister.html" id="btnApproveReg" style="display:none;">
+      <div class="btn-icon">🧑‍💼</div>
+      <div class="btn-label">อนุมัติพนักงานใหม่</div>
+      <div class="btn-sub">ลงทะเบียน / เปลี่ยนบัญชี LINE</div>
+    </a>
     <a class="action-btn btn-inspect" href="inspect.html" id="btnInspect" style="display:none;">
       <div class="btn-icon">🔍</div>
       <div class="btn-label">ตรวจสาขา</div>
@@ -565,25 +581,25 @@
 <!-- ONBOARD MODAL -->
 <div class="onboard-overlay" id="onboardOverlay">
   <div class="onboard-box">
-    <h2>ลงทะเบียนพนักงานใหม่</h2>
-    <p class="ob-sub">คัดลอก ID ด้านล่าง แล้วส่งให้ผู้จัดการทางแชท เพื่อเพิ่มเข้าระบบ</p>
+    <h2>ลงทะเบียนพนักงาน</h2>
+    <p class="ob-sub">กรอกชื่อเล่น + เลือกสาขา แล้วรอผู้จัดการอนุมัติ<br>(เคยใช้แอปแล้วแต่เปลี่ยนบัญชี LINE ก็กรอกแบบเดียวกัน)</p>
 
-    <div class="ob-field">
-      <div class="ob-field-label">ชื่อ LINE ของคุณ</div>
-      <div class="ob-field-value" id="obName">-</div>
+    <div id="obForm">
+      <div class="ob-field">
+        <div class="ob-field-label">ชื่อเล่น</div>
+        <input class="ob-input" id="obNick" maxlength="30" placeholder="เช่น ต้อม" autocomplete="off">
+      </div>
+      <div class="ob-field">
+        <div class="ob-field-label">สาขาที่ทำงาน</div>
+        <select class="ob-input" id="obBranch"><option value="">กำลังโหลด…</option></select>
+      </div>
+      <button class="ob-copy-btn" id="obSendBtn" onclick="sendRegister()">
+        <span id="obSendText">ส่งคำขอลงทะเบียน</span>
+      </button>
     </div>
+    <div class="ob-msg" id="obMsg"></div>
 
-    <div class="ob-field">
-      <div class="ob-field-label">User ID</div>
-      <div class="ob-field-value uid" id="obUid">-</div>
-    </div>
-
-    <button class="ob-copy-btn" id="obCopyBtn" onclick="copyUid()">
-      <span id="obCopyText">📋 คัดลอก ID</span>
-    </button>
-
-    <div class="ob-instruction">📨 ส่ง ID นี้ให้ผู้จัดการทางแชท แล้วรอเพิ่มเข้าระบบ</div>
-
+    <div class="ob-uid-line">LINE: <span id="obName">-</span><br>ID: <span id="obUid">-</span></div>
     <button class="ob-close-btn" onclick="closeOnboard()">ปิด</button>
   </div>
 </div>
@@ -753,7 +769,7 @@
   }
 
   // ปุ่มที่โชว์ตามสิทธิ์ — ซ่อนก่อนทุกครั้ง แล้วค่อยเปิดตามโปรไฟล์ล่าสุด (กันปุ่มค้างตอนลดสิทธิ์)
-  var GATED_BTNS = ['btnApprove','btnApproveLeave','btnRevenue','btnPick','btnInspect','btnInspectView'];
+  var GATED_BTNS = ['btnApprove','btnApproveLeave','btnRevenue','btnPick','btnInspect','btnInspectView','btnApproveReg'];
   function hideGatedButtons() {
     GATED_BTNS.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
   }
@@ -791,6 +807,9 @@
     var _canView = (emp.can_inspect_view === undefined) ? _roleFallback : emp.can_inspect_view;
     if (_canDo)   document.getElementById('btnInspect').style.display = 'flex';
     if (_canView) document.getElementById('btnInspectView').style.display = 'flex';
+    // v22: อนุมัติพนักงานใหม่ — สิทธิ์จาก backend (fallback = กฎ role เดิม)
+    var _canReg = (emp.can_approve_register === undefined) ? _roleFallback : emp.can_approve_register;
+    if (_canReg) document.getElementById('btnApproveReg').style.display = 'flex';
   }
 
   // วันหยุด + เตือน โหลดครั้งเดียวพอ (ไม่ว่าจะมาจาก cache หรือของจริง)
@@ -851,7 +870,9 @@
       hideGatedButtons();
       clearProfileSkeleton();
       document.getElementById('onboardLink').style.display = 'block';
-      showError('ไม่พบข้อมูลพนักงาน กรุณาติดต่อมิ้งค์');
+      // v22: คนใหม่ → เช็คว่ามีคำขอค้างไหม แล้วเปิดฟอร์มลงทะเบียนให้เลย
+      showError('ยังไม่ได้ลงทะเบียน — กรอกชื่อเล่น + สาขา ด้านล่าง');
+      checkRegistration(true);
       return;
     }
 
@@ -911,12 +932,69 @@
     })
     .catch(onProfileFail);   // liff.init / liff.getProfile พัง
   // ── ONBOARD MODAL ─────────────────────────────
-  window.openOnboard = function() {
+  // ── v22: ลงทะเบียนเอง ─────────────────────────
+  function obMsg(type, text) {
+    var m = document.getElementById('obMsg');
+    m.className = 'ob-msg ' + type; m.textContent = text;
+  }
+  function showRegState(st) {
+    if (st && st.status === 'pending') {
+      document.getElementById('obForm').style.display = 'none';
+      obMsg('wait', '⏳ ส่งคำขอแล้ว (' + (st.nickname || '') + ' · ' + (st.branch_name || '') + ') — รอผู้จัดการอนุมัติ แล้วจะได้ข้อความทาง LINE');
+      showError('⏳ รอผู้จัดการอนุมัติการลงทะเบียน');
+      return true;
+    }
+    if (st && st.status === 'rejected') obMsg('err', 'คำขอครั้งก่อนไม่ผ่าน — ติดต่อผู้จัดการ หรือส่งใหม่');
+    return false;
+  }
+  var regBranchesLoaded = false;
+  function loadRegBranches() {
+    if (regBranchesLoaded) return;
+    callGAS('getBranchesPublic').then(function(r) {
+      var sel = document.getElementById('obBranch');
+      if (!r || !r.ok) { sel.innerHTML = '<option value="">โหลดสาขาไม่ได้ — ลองใหม่</option>'; return; }
+      regBranchesLoaded = true;
+      sel.innerHTML = '<option value="">— เลือกสาขา —</option>' + r.branches.map(function(b) {
+        return '<option value="' + b.branch_id + '">' + String(b.branch_name).replace(/[<>&"]/g, '') + '</option>';
+      }).join('');
+    }).catch(function() {
+      document.getElementById('obBranch').innerHTML = '<option value="">โหลดสาขาไม่ได้ — ลองใหม่</option>';
+    });
+  }
+  function checkRegistration(openIfNew) {
+    callGAS('getMyRegistration').then(function(st) {
+      if (showRegState(st)) { if (openIfNew) window.openOnboard(true); return; }
+      if (openIfNew) window.openOnboard();
+    }).catch(function() { if (openIfNew) window.openOnboard(); });
+  }
+  window.sendRegister = function() {
+    var nick = document.getElementById('obNick').value.trim();
+    var bid = Number(document.getElementById('obBranch').value);
+    if (!nick) { obMsg('err', 'กรอกชื่อเล่นก่อน'); return; }
+    if (!bid) { obMsg('err', 'เลือกสาขาก่อน'); return; }
+    var btn = document.getElementById('obSendBtn');
+    btn.disabled = true; document.getElementById('obSendText').textContent = 'กำลังส่ง…';
+    callGAS('registerSelf', { nickname: nick, branch_id: bid, display_name: (liffProfile && liffProfile.displayName) || '' })
+      .then(function(r) {
+        btn.disabled = false; document.getElementById('obSendText').textContent = 'ส่งคำขอลงทะเบียน';
+        if (r.ok || r.error === 'ALREADY_PENDING') {
+          var b = document.getElementById('obBranch');
+          showRegState({ status: 'pending', nickname: nick, branch_name: b.options[b.selectedIndex].text });
+        } else if (r.error === 'ALREADY_REGISTERED') {
+          obMsg('ok', 'ลงทะเบียนแล้ว — กำลังโหลดใหม่…'); setTimeout(function(){ location.reload(); }, 1200);
+        } else {
+          obMsg('err', r.message || ('ส่งไม่สำเร็จ: ' + r.error));
+        }
+      }).catch(function(e) {
+        btn.disabled = false; document.getElementById('obSendText').textContent = 'ส่งคำขอลงทะเบียน';
+        obMsg('err', 'เชื่อมต่อไม่สำเร็จ ลองใหม่ [' + (e && e.message ? e.message : e) + ']');
+      });
+  };
+
+  window.openOnboard = function(keepState) {
     document.getElementById('onboardOverlay').style.display = 'flex';
-    // reset ปุ่ม copy
-    var btn = document.getElementById('obCopyBtn');
-    btn.classList.remove('copied');
-    document.getElementById('obCopyText').textContent = '📋 คัดลอก ID';
+    if (!keepState) { document.getElementById('obForm').style.display = 'block'; document.getElementById('obMsg').className = 'ob-msg'; }
+    loadRegBranches();
 
     if (liffProfile && liffProfile.userId) {
       // มี profile จาก init แล้ว ใช้เลย

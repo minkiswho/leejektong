@@ -69,6 +69,13 @@
   .after a{display:block;text-align:center;text-decoration:none;font-size:17px;font-weight:700;border-radius:12px;padding:15px;margin-top:10px}
   .after .go{background:var(--green);color:#fff}
   .after .home{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  /* v22: แก้ยอด */
+  .edit-box{display:none;background:#fff;border:2px solid var(--amber);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+  .edit-box .t{font-size:15px;font-weight:700;margin-bottom:8px}
+  .edit-box .cmp{font-size:22px;font-weight:800;text-align:center;margin:8px 0}
+  .edit-box button{width:100%;font-size:16px;font-weight:700;border:none;border-radius:12px;padding:14px;margin-top:6px;font-family:inherit}
+  .edit-box .go{background:var(--amber);color:#fff}
+  .edit-box .no{background:#fff;color:var(--muted);border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -80,6 +87,14 @@
   <div id="boot" class="loading">กำลังโหลด...</div>
 
   <div id="msg" class="msg"></div>
+
+  <!-- v22: ส่งซ้ำคืนเดียวกัน → แก้ยอดได้ (คนส่งเอง / ผู้จัดการ) -->
+  <div class="edit-box" id="editBox">
+    <div class="t" id="editTitle"></div>
+    <div class="cmp" id="editCmp"></div>
+    <button class="go" id="editGo" type="button">✏️ แก้เป็นยอดใหม่</button>
+    <button class="no" id="editNo" type="button">ไม่แก้</button>
+  </div>
 
   <!-- v21: หลังส่งสำเร็จ -->
   <div class="after" id="after">
@@ -99,7 +114,7 @@
     <div class="card">
       <label for="branch">สาขา</label>
       <select id="branch"><option value="">— เลือกสาขา —</option></select>
-      <p class="hint">เลือกสาขาที่ต้องการลงยอด (ลงแทนสาขาอื่นได้)</p>
+      <p class="hint" id="branchHint">เลือกสาขาที่ต้องการลงยอด (ลงแทนสาขาอื่นได้)</p>
     </div>
 
     <div class="card">
@@ -128,6 +143,7 @@ var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
 
 var uid = null;
 var emp = null;
+var todayBranchId = null;
 
 // ===== helpers =====
 function $(id){ return document.getElementById(id); }
@@ -226,9 +242,15 @@ liff.init({ liffId: LIFF_ID }).then(function(){
     return null;
   }
   emp = res.employee;
-  return post({ token: SHARED_SECRET, userId: uid, action: "getBranches" });
-}).then(function(res){
-  if(!res) return;
+  // v22: สาขาวันนี้ (จากเช็คอิน) เป็นค่าเริ่มต้น — ดึงคู่กับรายชื่อสาขา · เช็คไม่ได้ก็ใช้สาขาประจำ
+  return Promise.all([
+    post({ token: SHARED_SECRET, userId: uid, action: "getBranches" }),
+    post({ token: SHARED_SECRET, userId: uid, action: "getTodayStatus" }).catch(function(){ return null; })
+  ]);
+}).then(function(both){
+  if(!both) return;
+  var res = both[0], ts = both[1];
+  todayBranchId = (ts && ts.ok && ts.today_branch_id) ? Number(ts.today_branch_id) : null;
   if(!res.ok){
     $("boot").style.display = "none";
     showMsg("err", "โหลดรายชื่อสาขาไม่สำเร็จ: " + (res.error || "unknown"));
@@ -241,8 +263,10 @@ liff.init({ liffId: LIFF_ID }).then(function(){
     o.text = b.branch_name;
     sel.appendChild(o);
   });
-  // default = สาขาประจำตัว (เปลี่ยนได้)
-  if(emp && emp.branch_id){ sel.value = String(emp.branch_id); }
+  // default = สาขาที่เช็คอินวันนี้ → ไม่มีก็สาขาประจำตัว (เปลี่ยนได้)
+  if(todayBranchId){ sel.value = String(todayBranchId); }
+  if(!sel.value && emp && emp.branch_id){ sel.value = String(emp.branch_id); }
+  if(todayBranchId && sel.value === String(todayBranchId)){ $("branchHint").innerText = "ค่าเริ่มต้น = สาขาที่คุณเช็คอินวันนี้ (เปลี่ยนได้)"; }
 
   $("who").innerHTML = "ผู้กรอก: <b>" + emp.name + "</b>";
   $("boot").style.display = "none";
@@ -252,9 +276,38 @@ liff.init({ liffId: LIFF_ID }).then(function(){
   showMsg("err", "เกิดข้อผิดพลาด: " + (e && e.message ? e.message : e));
 });
 
+// ===== v22: แก้ยอดที่ส่งไปแล้ว (คืนเดียวกัน) =====
+function offerEdit(branchId, oldAmt, newAmt, info){
+  if(oldAmt === newAmt){ return; }
+  $("editTitle").innerText = "ส่งผิด? แก้ยอด " + info.branch_name + (info.date ? " (" + isoToLabel(info.date) + ")" : "");
+  $("editCmp").innerText = oldAmt.toLocaleString("en-US") + " → " + newAmt.toLocaleString("en-US") + " บาท";
+  $("editBox").style.display = "block";
+  $("editNo").onclick = function(){ $("editBox").style.display = "none"; };
+  $("editGo").onclick = function(){
+    var b = $("editGo"); b.disabled = true; b.innerText = "กำลังแก้...";
+    post({ token: SHARED_SECRET, userId: uid, action: "editDailySales", branch_id: branchId, amount: newAmt, note: $("note").value.trim() })
+      .then(function(r){
+        b.disabled = false; b.innerText = "✏️ แก้เป็นยอดใหม่";
+        if(r.ok){
+          $("editBox").style.display = "none";
+          showMsg("ok", "✓ แก้ยอดแล้ว\n" + r.branch_name + " : " + Number(r.old_amount).toLocaleString("en-US") + " → " + Number(r.amount).toLocaleString("en-US") + " บาท\nยอดของวันที่ " + isoToLabel(r.date));
+          $("form").style.display = "none";
+          $("after").querySelector(".go").style.display = salesLate ? "none" : "block";
+          $("after").style.display = "block";
+        } else {
+          showMsg("err", "แก้ไม่สำเร็จ: " + (r.message || r.error));
+        }
+      }).catch(function(e){
+        b.disabled = false; b.innerText = "✏️ แก้เป็นยอดใหม่";
+        showMsg("err", "เชื่อมต่อไม่สำเร็จ ลองใหม่ [" + (e && e.message ? e.message : e) + "]");
+      });
+  };
+}
+
 // ===== submit =====
 function submitSales(){
   hideMsg();
+  $("editBox").style.display = "none";
   var branch_id = Number($("branch").value);
   var amount = amountValue();
 
@@ -282,7 +335,8 @@ function submitSales(){
     btn.disabled = false;
     btn.innerText = "ส่งยอดขาย";
     if(res.error === "ALREADY_SUBMITTED"){
-      showMsg("warn", "สาขานี้ลงยอด" + (res.date ? "ของวันที่ " + isoToLabel(res.date) : "วันนี้") + "แล้ว: " + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท");
+      showMsg("warn", "สาขานี้ลงยอด" + (res.date ? "ของวันที่ " + isoToLabel(res.date) : "วันนี้") + "แล้ว: " + res.branch_name + " : " + Number(res.amount).toLocaleString("en-US") + " บาท" + (res.by ? " (โดย " + res.by + ")" : ""));
+      if(res.can_edit){ offerEdit(branch_id, Number(res.amount), amount, res); }
     } else if(res.error === "INVALID_AMOUNT"){
       showMsg("warn", "ยอดไม่ถูกต้อง ต้องอย่างน้อย 1 บาท");
     } else if(res.error === "BRANCH_NOT_FOUND"){

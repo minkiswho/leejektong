@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>อนุมัติพนักงานใหม่</title>
+<script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+<style>
+  :root { --green:#06C755; --red:#E53935; --bg:#f5f6f8; --line:#e3e6ea; --ink:#1a1a1a; --mute:#7a8290; --blue:#3b6fd4; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,"Helvetica Neue","Noto Sans Thai","Sarabun",sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:480px; margin:0 auto; padding:20px 16px 40px; }
+  .home-link { display:inline-block; font-size:14px; font-weight:600; color:#05a948; text-decoration:none; padding:4px 0; }
+  h1 { font-size:20px; margin:8px 0 6px; }
+  .sub { font-size:13px; color:var(--mute); margin:0 0 16px; line-height:1.5; }
+  .center { text-align:center; color:var(--mute); padding:40px 0; }
+  .req { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .name { font-size:17px; font-weight:700; }
+  .meta { font-size:13px; color:var(--mute); margin-top:2px; }
+  .mode { display:flex; gap:8px; margin-top:12px; }
+  .mode button { flex:1; padding:10px 6px; border:1.5px solid var(--line); background:#fff; color:var(--mute); border-radius:10px; font-size:13.5px; font-weight:700; font-family:inherit; }
+  .mode button.on { border-color:var(--blue); color:var(--blue); background:#eef3fb; }
+  .linkbox { display:none; margin-top:10px; }
+  .linkbox label { font-size:13px; color:var(--mute); display:block; margin-bottom:5px; }
+  .linkbox select { width:100%; border:1px solid var(--line); border-radius:8px; padding:10px; font-size:15px; font-family:inherit; background:#fff; }
+  .hint { font-size:12px; color:var(--mute); margin-top:8px; line-height:1.5; }
+  .btns { display:flex; gap:10px; margin-top:14px; }
+  .btns button { flex:1; padding:13px; border:0; border-radius:10px; font-size:15px; font-weight:600; color:#fff; font-family:inherit; }
+  .approve { background:var(--green); }
+  .reject { background:var(--red); }
+  button:disabled { opacity:.5; }
+  .locked { margin-top:12px; padding:10px; border-radius:8px; font-size:13px; text-align:center; background:#f0f2f5; color:var(--mute); }
+  .neterr { margin-top:10px; padding:10px; border-radius:8px; font-size:13px; background:#fdecec; color:#b32020; display:none; }
+  .cf-overlay { position:fixed; inset:0; background:rgba(26,26,26,.55); display:none; align-items:flex-start; justify-content:center; padding:16vh 20px 0; z-index:50; }
+  .cf-box { background:#fff; border-radius:16px; padding:20px 18px 12px; width:100%; max-width:360px; text-align:center; }
+  .cf-t { font-size:16px; font-weight:700; margin-bottom:14px; line-height:1.5; }
+  .cf-box button { width:100%; padding:13px; border:0; border-radius:10px; font-size:15px; font-weight:700; font-family:inherit; }
+  .cf-ok { background:var(--red); color:#fff; }
+  .cf-no { background:transparent; color:var(--mute); margin-top:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="home-link" href="index.html">‹ หน้าแรก</a>
+  <h1>อนุมัติพนักงานใหม่</h1>
+  <p class="sub">อนุมัติแล้วพนักงานเข้าแอปได้ทันที · เงินเดือน / สิทธิ์ต่าง ๆ Mink ตั้งในชีต EMPLOYEES เอง (คนใหม่เริ่มที่ payroll_enabled = no)</p>
+  <div id="loading" class="center">กำลังโหลด…</div>
+  <div id="list"></div>
+  <div id="empty" class="center" style="display:none;">ไม่มีคำขอที่รออนุมัติ</div>
+</div>
+
+<div class="cf-overlay" id="cf">
+  <div class="cf-box">
+    <div class="cf-t" id="cfT"></div>
+    <button class="cf-ok" id="cfOk">ยืนยันปฏิเสธ</button>
+    <button class="cf-no" id="cfNo">ยกเลิก</button>
+  </div>
+</div>
+
+<script>
+  var LIFF_ID       = "2010362712-uGq1XJQ6";
+  var GAS_URL       = "https://script.google.com/macros/s/AKfycbzC_IDcWumwKzkHKRjBFhsFsugV43eHx7tpC4ngOdelBLmClZBvdiAQJQ0by6q6V2jqRQ/exec";
+  var SHARED_SECRET = "LJT_8f3Kq9mZx2Wp5Rv7Nt4Hy6Bc1Ds0Ga";
+  var USER_ID = null;
+  var PEOPLE = [];
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+  async function call(payload){
+    payload.token = SHARED_SECRET;
+    payload.userId = USER_ID;
+    var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    var t = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 30000);
+    try {
+      var res = await fetch(GAS_URL, { method: "POST", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload), signal: ctrl ? ctrl.signal : undefined });
+      return await res.json();
+    } catch (e) {
+      throw new Error((e && e.name === "AbortError") ? "หมดเวลา 30 วิ" : (e && e.message ? e.message : String(e)));
+    } finally { clearTimeout(t); }
+  }
+
+  function askReject(text){
+    return new Promise(function(resolve){
+      $("cfT").textContent = text; $("cf").style.display = "flex";
+      $("cfOk").onclick = function(){ $("cf").style.display = "none"; resolve(true); };
+      $("cfNo").onclick = function(){ $("cf").style.display = "none"; resolve(false); };
+    });
+  }
+
+  async function init(){
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      var prof = await liff.getProfile();
+      USER_ID = prof.userId;
+      await load();
+    } catch (e) {
+      $("loading").textContent = "เปิดผ่านเมนูใน LINE เท่านั้น";
+    }
+  }
+
+  async function load(){
+    $("loading").style.display = "block"; $("list").innerHTML = ""; $("empty").style.display = "none";
+    try {
+      var data = await call({ action: "getPendingRegistrations" });
+      $("loading").style.display = "none";
+      if (!data.ok) { $("empty").textContent = data.message || data.error || "โหลดไม่สำเร็จ"; $("empty").style.display = "block"; return; }
+      PEOPLE = data.people || [];
+      if (!data.pending.length) { $("empty").style.display = "block"; return; }
+      data.pending.forEach(render);
+    } catch (e) {
+      $("loading").innerHTML = "เชื่อมต่อไม่สำเร็จ [" + esc(e.message) + "]<br><br><button onclick=\"load()\" style=\"padding:10px 18px;border-radius:10px;border:1px solid #ccc;background:#fff\">ลองใหม่</button>";
+    }
+  }
+
+  function render(r){
+    var card = document.createElement("div");
+    card.className = "req";
+    var opts = '<option value="">— เลือกพนักงานเดิม —</option>' + PEOPLE.map(function(p){
+      return '<option value="' + esc(p.name) + '">' + esc(p.name) + (p.branch_name ? ' · ' + esc(p.branch_name) : '') + (p.has_line ? '' : ' (ยังไม่มี LINE)') + '</option>';
+    }).join('');
+    card.innerHTML =
+      '<div class="name">' + esc(r.nickname) + '</div>' +
+      '<div class="meta">สาขา: ' + esc(r.branch_name) + (r.display_name ? ' · LINE: ' + esc(r.display_name) : '') + ' · ขอเมื่อ ' + esc(r.when) + '</div>' +
+      '<div class="mode"><button type="button" class="on" data-m="new">👤 คนใหม่</button><button type="button" data-m="link">🔗 ผูกกับคนเดิม</button></div>' +
+      '<div class="linkbox"><label>เปลี่ยนบัญชี LINE ของ…</label><select>' + opts + '</select>' +
+        '<div class="hint">ประวัติเช็คอิน / เบิก / เงินเดือนของบัญชีเก่าจะตามมาด้วย · เงินเดือนและสิทธิ์คงเดิม</div></div>' +
+      '<div class="btns"><button class="approve">อนุมัติ</button><button class="reject">ปฏิเสธ</button></div>' +
+      '<div class="locked" style="display:none;"></div><div class="neterr"></div>';
+
+    var mode = "new";
+    var bNew = card.querySelector('[data-m="new"]'), bLink = card.querySelector('[data-m="link"]');
+    var linkbox = card.querySelector(".linkbox"), sel = card.querySelector("select");
+    var btnA = card.querySelector(".approve"), btnR = card.querySelector(".reject");
+    var locked = card.querySelector(".locked"), neterr = card.querySelector(".neterr");
+    function setMode(m){
+      mode = m;
+      bNew.classList.toggle("on", m === "new"); bLink.classList.toggle("on", m === "link");
+      linkbox.style.display = (m === "link") ? "block" : "none";
+      btnA.textContent = (m === "link") ? "อนุมัติ (ผูกคนเดิม)" : "อนุมัติ";
+    }
+    bNew.onclick = function(){ setMode("new"); };
+    bLink.onclick = function(){ setMode("link"); };
+    function lockCard(text){
+      card.querySelector(".mode").style.display = "none"; linkbox.style.display = "none";
+      card.querySelector(".btns").style.display = "none";
+      locked.textContent = text; locked.style.display = "block";
+    }
+    function disableBtns(v){ btnA.disabled = v; btnR.disabled = v; }
+    function netFail(e, btn, label){
+      neterr.textContent = "⚠️ เชื่อมต่อไม่สำเร็จ [" + (e && e.message ? e.message : e) + "] — กดใหม่ได้";
+      neterr.style.display = "block"; disableBtns(false); btn.textContent = label;
+    }
+
+    btnA.addEventListener("click", async function(){
+      var linkName = "";
+      if (mode === "link") {
+        linkName = sel.value;
+        if (!linkName) { neterr.textContent = "เลือกพนักงานเดิมก่อน"; neterr.style.display = "block"; return; }
+      }
+      var label = btnA.textContent;
+      disableBtns(true); btnA.textContent = "…"; neterr.style.display = "none";
+      try {
+        var res = await call({ action: "decideRegistration", reg_id: r.reg_id, decision: "approve", link_name: linkName });
+        if (res.ok) { lockCard(res.linked_to ? "✅ ผูกกับ " + res.linked_to + " แล้ว" : "✅ อนุมัติแล้ว — เพิ่มใน EMPLOYEES (payroll_enabled = no)"); }
+        else if (res.error === "ALREADY_DECIDED") { lockCard("🔒 " + res.message); }
+        else { neterr.textContent = "❌ " + (res.message || res.error); neterr.style.display = "block"; disableBtns(false); btnA.textContent = label; }
+      } catch (e) { netFail(e, btnA, label); }
+    });
+
+    btnR.addEventListener("click", async function(){
+      if (!(await askReject("ปฏิเสธคำขอของ " + r.nickname + "?"))) return;
+      disableBtns(true); btnR.textContent = "…"; neterr.style.display = "none";
+      try {
+        var res = await call({ action: "decideRegistration", reg_id: r.reg_id, decision: "reject" });
+        if (res.ok) { lockCard("❌ ปฏิเสธแล้ว"); }
+        else if (res.error === "ALREADY_DECIDED") { lockCard("🔒 " + res.message); }
+        else { neterr.textContent = "❌ " + (res.message || res.error); neterr.style.display = "block"; disableBtns(false); btnR.textContent = "ปฏิเสธ"; }
+      } catch (e) { netFail(e, btnR, "ปฏิเสธ"); }
+    });
+
+    $("list").appendChild(card);
+  }
+
+  init();
+</script>
+</body>
+</html>

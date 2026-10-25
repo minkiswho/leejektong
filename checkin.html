@@ -175,6 +175,14 @@
       color: #fff; background: #C0392B; font-family: inherit; }
     .cf-cancel { width: 100%; border: none; background: transparent; padding: 12px; margin-top: 6px;
       font-size: 15px; color: #8794A3; font-weight: 600; font-family: inherit; }
+    /* v22 */
+    .cf-warn { display: none; background: #FEF5E7; border: 1px solid #F5CBA7; color: #A04000; border-radius: 12px;
+      padding: 10px 12px; font-size: 14px; font-weight: 700; margin: 0 0 12px; text-align: left; }
+    .cf-warn a { display: block; margin-top: 8px; text-align: center; background: #E67E22; color: #fff; text-decoration: none;
+      border-radius: 10px; padding: 10px; font-weight: 800; }
+    .gps-retry { display: none; margin-top: 10px; width: 100%; border: 1.5px solid var(--brand); background: #fff; color: var(--brand);
+      border-radius: 10px; padding: 10px; font-size: 14px; font-weight: 700; font-family: inherit; }
+    .gps-help { display: none; margin-top: 8px; font-size: 12px; color: var(--sub); line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -219,6 +227,8 @@
     <div class="gps-label" id="gpsLabel">กำลังระบุพิกัด...</div>
   </div>
   <div class="gps-sub" id="gpsSub">กรุณาอนุญาตการเข้าถึง GPS</div>
+  <div class="gps-help" id="gpsHelp">ถ้าเคยกด "ไม่อนุญาต": iPhone → ตั้งค่า › LINE › ตำแหน่งที่ตั้ง › ขณะใช้แอป · Android → แตะค้างที่แอป LINE › ข้อมูลแอป › สิทธิ์ › ตำแหน่ง · แล้วกดลองใหม่</div>
+  <button class="gps-retry" id="gpsRetry" type="button">📍 ลองหาตำแหน่งใหม่</button>
 </div>
 
 <!-- NOTE -->
@@ -240,6 +250,7 @@
   <div class="cf-box">
     <div class="cf-title">ยืนยันเช็คเอาท์?</div>
     <div class="cf-sub" id="cfSub"></div>
+    <div class="cf-warn" id="cfWarn"><span id="cfWarnText"></span><a href="sales.html">💰 ไปส่งยอดก่อน</a></div>
     <button class="cf-ok" id="cfOk">👋 ยืนยันเช็คเอาท์</button>
     <button class="cf-cancel" id="cfCancel">ยกเลิก</button>
   </div>
@@ -257,6 +268,8 @@
   var gpsCoords = null;  // { lat, lng }
   var currentState = null; // 'none' | 'in' | 'done'
   var gpsReady = false;
+  var gpsAcc = null;
+  var todayStatus = {};  // v22: ผล getTodayStatus ล่าสุด (สาขาวันนี้ / เตือนส่งยอด)
   var lockUntil = 0;     // v21: หลังเช็คอินสำเร็จ ปุ่มเช็คเอาท์ยังกดไม่ได้ช่วงสั้น ๆ (กันกดเบิ้ล)
   var LOCK_MS = 5000;
 
@@ -289,29 +302,49 @@
   }
 
   // ── GPS ─────────────────────────────────────────
+  // v22: บอกหลังบ้านว่าขอตำแหน่งไม่ได้ (เก็บใน CHECKIN_FAIL) — ไม่รอผล
+  function reportGpsFail(reason) {
+    try {
+      callGAS({ action: 'logCheckinFail', reason: reason, type: currentState === 'in' ? 'checkout' : 'checkin' })
+        .catch(function(){});
+    } catch (e) {}
+  }
+
   function startGPS() {
+    el('gpsRetry').style.display = 'none';
+    el('gpsHelp').style.display = 'none';
     if (!navigator.geolocation) {
       setGPS('fail', 'เบราว์เซอร์ไม่รองรับ GPS', '');
+      reportGpsFail('UNSUPPORTED');
       return;
     }
+    gpsReady = false;
+    setGPS('searching', 'กำลังระบุพิกัด...', 'กรุณาอนุญาตการเข้าถึง GPS');
+    updateBtnState();
     navigator.geolocation.getCurrentPosition(
       function(pos) {
         gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         var acc = Math.round(pos.coords.accuracy);
+        gpsAcc = acc;
         gpsReady = true;
         setGPS('ok', 'ระบุพิกัดแล้ว', 'ความแม่นยำ ±' + acc + ' ม.');
         updateBtnState();
       },
       function(err) {
-        var msg = err.code === 1
-          ? 'กรุณาอนุญาต GPS แล้วลองใหม่'
-          : 'ไม่สามารถระบุพิกัดได้';
+        var denied = (err && err.code === 1);
+        var msg = denied
+          ? 'ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง'
+          : (err && err.code === 3 ? 'หาตำแหน่งไม่ทัน (สัญญาณอ่อน)' : 'ไม่สามารถระบุพิกัดได้');
         setGPS('fail', 'GPS ไม่พร้อม', msg);
+        el('gpsRetry').style.display = 'block';
+        if (denied) el('gpsHelp').style.display = 'block';
+        reportGpsFail(denied ? 'DENIED' : (err && err.code === 3 ? 'TIMEOUT' : 'UNAVAILABLE'));
         updateBtnState();
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   }
+  el('gpsRetry').addEventListener('click', startGPS);
 
   function setGPS(state, label, sub) {
     var dot = el('gpsDot');
@@ -367,6 +400,13 @@
   var cfOpenedAt = 0;
   function askCheckout(onYes) {
     el('cfSub').textContent = 'เวลา ' + nowTime() + ' น. · บันทึกแล้วแก้ไม่ได้';
+    // v22: สาขาวันนี้ยังไม่มีใครส่งยอด (หลัง 17:00) → เตือน ไม่บล็อก
+    if (todayStatus.sales_missing) {
+      el('cfWarnText').textContent = '⚠️ ' + (todayStatus.sales_branch_name || 'สาขานี้') + ' ยังไม่มีใครส่งยอดวันนี้';
+      el('cfWarn').style.display = 'block';
+    } else {
+      el('cfWarn').style.display = 'none';
+    }
     el('cfOverlay').style.display = 'flex';
     cfOpenedAt = Date.now();
     el('cfOk').onclick = function() {
@@ -400,6 +440,7 @@
       action: action,
       lat: gpsCoords.lat,
       lng: gpsCoords.lng,
+      accuracy: gpsAcc,
       note: note
     })
     .then(function(data) {
@@ -413,14 +454,15 @@
         // อัปเดต state
         if (data.type === 'checkin') {
           lockUntil = Date.now() + LOCK_MS;
-          setStatus('in', '🟢', 'เช็คอินแล้ว', 'เข้างาน ' + data.time + ' น.');
+          todayStatus = { today_branch_name: data.branch_name };
+          setStatus('in', '🟢', 'เช็คอินแล้ว', 'เข้างาน ' + data.time + ' น. · ' + data.branch_name);
         } else {
           setStatus('done', '✔️', 'เสร็จสิ้นวันนี้', 'เข้า / ออก บันทึกครบแล้ว');
         }
         updateBtnState();
         el('noteInput').value = '';
       } else {
-        handleError(data.error);
+        handleError(data.error, data);
       }
     })
     .catch(function(e) {
@@ -430,7 +472,14 @@
     });
   }
 
-  function handleError(code) {
+  function handleError(code, data) {
+    if (code === 'OUT_OF_RANGE' && data && data.nearest_branch_name) {
+      // v22: เช็คได้ทุกสาขา → บอกว่าใกล้สาขาไหนสุด ห่างเท่าไหร่
+      showResult('fail', '🗺️ อยู่นอกรัศมีร้าน',
+        'สาขาที่ใกล้สุด: ' + data.nearest_branch_name + ' ห่าง ' + data.distance_m + ' ม.\nต้องอยู่ในรัศมี ' + (data.radius_m || 200) + ' ม. — เดินเข้าใกล้ร้านแล้วกด "ลองหาตำแหน่งใหม่"');
+      el('gpsRetry').style.display = 'block';
+      return;
+    }
     var msgs = {
       UNAUTHORIZED:        ['❌ ไม่ได้รับอนุญาต', 'กรุณาออกแล้วเข้า LINE ใหม่'],
       USER_NOT_FOUND:      ['❌ ไม่พบข้อมูลพนักงาน', 'ติดต่อมิ้งค์เพื่อตรวจสอบ'],
@@ -515,13 +564,15 @@
     callGAS({ action: 'getTodayStatus' })
       .then(function(data) {
         if (data.ok) {
+          todayStatus = data;
+          var at = data.today_branch_name ? ' · ' + data.today_branch_name : '';
           if (data.status === 'done') {
             setStatus('done', '✔️', 'เสร็จสิ้นวันนี้',
-              'เข้า ' + data.checkin_time + ' / ออก ' + data.checkout_time);
+              'เข้า ' + data.checkin_time + ' / ออก ' + data.checkout_time + at);
           } else if (data.status === 'in') {
-            setStatus('in', '🟢', 'เช็คอินแล้ว', 'เข้างาน ' + data.checkin_time + ' น.');
+            setStatus('in', '🟢', 'เช็คอินแล้ว', 'เข้างาน ' + data.checkin_time + ' น.' + at);
           } else {
-            setStatus('none', '⏰', 'ยังไม่ได้เช็คอิน', 'กด เช็คอิน เมื่อถึงร้านแล้ว');
+            setStatus('none', '⏰', 'ยังไม่ได้เช็คอิน', 'เช็คอินได้ทุกสาขา — ระบบเลือกสาขาที่คุณอยู่ให้เอง');
           }
         } else {
           // ถ้า endpoint ยังไม่มี fallback เป็น none

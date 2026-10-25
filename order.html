@@ -267,7 +267,25 @@
     .branch-hint.warn { color: #B9770E; font-weight: 700; }
 
     /* BOTTOM SPACER */
-    .spacer-bottom { height: 160px; }
+    .spacer-bottom { height: 96px; }
+
+    /* v22: ครั้งก่อน + สรุปก่อนส่ง */
+    .last-q { display: block; font-size: 11.5px; color: var(--sub); margin-top: 2px; font-weight: 600; }
+    .repeat-btn { display: none; width: 100%; margin-top: 10px; padding: 11px; border-radius: 12px;
+      border: 1.5px dashed var(--brand); background: #fff; color: var(--brand);
+      font-size: 14px; font-weight: 800; font-family: inherit; cursor: pointer; }
+    .sum-overlay { position: fixed; inset: 0; background: rgba(44,26,14,.55); display: none;
+      align-items: flex-end; justify-content: center; z-index: 150; }
+    .sum-box { background: var(--card); width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto;
+      border-radius: 20px 20px 0 0; padding: 18px 16px 20px; box-shadow: 0 -8px 32px rgba(0,0,0,.2); }
+    .sum-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+    .sum-branch { font-size: 22px; font-weight: 800; color: var(--brand); margin-bottom: 12px; }
+    .sum-list { background: var(--surface); border-radius: 12px; padding: 6px 12px; margin-bottom: 12px; }
+    .sum-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
+    .sum-row:last-child { border-bottom: 0; }
+    .sum-row b { font-size: 15px; }
+    .sum-back { width: 100%; margin-top: 8px; padding: 13px; background: transparent; border: none;
+      color: var(--sub); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -303,6 +321,7 @@
   <label class="branch-label" for="branchSelect">สั่งให้สาขา</label>
   <select class="branch-select" id="branchSelect"></select>
   <p class="branch-hint">ค่าเริ่มต้น = สาขาของคุณ — เปลี่ยนได้ถ้าสั่งแทนสาขาอื่น</p>
+  <button type="button" class="repeat-btn" id="repeatBtn" onclick="repeatLast()">↺ สั่งเหมือนครั้งก่อน</button>
 </div>
 
 <!-- LOADING -->
@@ -315,8 +334,19 @@
 <div id="itemList"></div>
 <div class="spacer-bottom"></div>
 
-<!-- STICKY FOOTER -->
+<!-- STICKY FOOTER (v22: ปุ่มเดียว → หน้าสรุป) -->
 <div class="order-footer" id="orderFooter" style="display:none">
+  <button class="submit-btn" id="submitBtn" disabled>
+    <span id="btnText">เลือกอย่างน้อย 1 รายการ</span>
+  </button>
+</div>
+
+<!-- v22: สรุปก่อนยืนยัน -->
+<div class="sum-overlay" id="sumOverlay">
+  <div class="sum-box">
+    <div class="sum-title">ตรวจรายการก่อนส่ง</div>
+    <div class="sum-branch" id="sumBranch"></div>
+    <div class="sum-list" id="sumList"></div>
   <div class="deliver-row">
     <label class="deliver-label">ส่งของวันไหน</label>
     <div class="deliver-opts">
@@ -335,10 +365,12 @@
     <textarea class="note-input" id="noteInput" rows="2"
       placeholder="เช่น ขอเพิ่มด่วน / ของหมดสต็อก..."></textarea>
   </div>
-  <button class="submit-btn" id="submitBtn" disabled>
+  <button class="submit-btn" id="confirmBtn">
     <div class="spinner" id="spinner"></div>
-    <span id="btnText">เลือกอย่างน้อย 1 รายการ</span>
+    <span id="cText">ยืนยันส่ง</span>
   </button>
+  <button type="button" class="sum-back" id="sumBack">‹ กลับไปแก้</button>
+  </div>
 </div>
 
 <!-- RESULT OVERLAY -->
@@ -360,6 +392,9 @@
   var allItems = [];   // [{item_id, item_name}]
   var qty = {};        // { item_id: number }
   var deliverChoice = 'today';   // 'today' | 'tomorrow' — default วันนี้
+  var todayBranchId = null;      // v22: สาขาที่เช็คอินวันนี้
+  var lastOrder = null;          // v22: { branch_id, items:{id:qty}, date_disp, by }
+  var lastReq = 0;
 
   // ── BRANCH DROPDOWN ──────────────────────────────
   // เติมรายชื่อสาขาลง dropdown + ตั้ง default = สาขาพนักงาน
@@ -397,6 +432,7 @@
       selectedBranchId = Number(sel.value) || null;
       updateBranchWarn();
       updateSubmitBtn();
+      loadLastOrder();
     });
 
     el('branchSection').style.display = 'block';
@@ -407,7 +443,9 @@
   // เตือนเมื่อ ยังไม่เลือกสาขา หรือ สั่งให้สาขาที่ไม่ใช่สาขาตัวเอง
   function updateBranchWarn() {
     var sel = el('branchSelect'), hint = document.querySelector('.branch-hint');
-    var warn = false, msg = 'ค่าเริ่มต้น = สาขาของคุณ — เปลี่ยนได้ถ้าสั่งแทนสาขาอื่น';
+    var warn = false, msg = (todayBranchId && homeBranchId === todayBranchId)
+      ? 'ค่าเริ่มต้น = สาขาที่คุณเช็คอินวันนี้ — เปลี่ยนได้ถ้าสั่งแทนสาขาอื่น'
+      : 'ค่าเริ่มต้น = สาขาของคุณ — เปลี่ยนได้ถ้าสั่งแทนสาขาอื่น';
     if (!selectedBranchId) {
       warn = true; msg = '⚠️ กรุณาเลือกสาขาที่จะสั่งให้';
     } else if (homeBranchId && selectedBranchId !== homeBranchId) {
@@ -508,7 +546,7 @@
     } else {
       btn.disabled = false;
       var bName = selectedBranchId ? (branchNames[String(selectedBranchId)] || '') : '';
-      el('btnText').textContent = '📨  ส่งคำสั่ง (' + count + ' รายการ)' + (bName ? ' → ' + bName : '');
+      el('btnText').textContent = 'ถัดไป: ตรวจรายการ (' + count + ') →' + (bName ? ' ' + bName : '');
     }
   }
 
@@ -540,7 +578,7 @@
         row.className = 'item-row';
         row.id = 'row-' + id;
         row.innerHTML =
-          '<span class="item-name">' + esc(item.item_name) + '</span>' +
+          '<span class="item-name">' + esc(item.item_name) + '<span class="last-q" id="last-' + id + '"></span></span>' +
           '<div class="qty-ctrl">' +
             '<button class="qty-btn minus" data-id="' + id + '" onclick="changeQty(' + id + ',-1)">−</button>' +
             '<input class="qty-num" id="qty-' + id + '" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="0" ' +
@@ -585,16 +623,66 @@
   };
   window.blurQty = function(itemId, input) { input.value = qty[itemId] || 0; };   // ช่องว่าง/ตัวอักษร → 0
 
-  // ── SUBMIT ───────────────────────────────────────
-  el('submitBtn').addEventListener('click', function() {
-    var selectedItems = allItems.filter(function(it){ return qty[it.item_id] > 0; });
-    if (!selectedItems.length) return;
+  // ── v22: ครั้งก่อน ───────────────────────────────
+  function loadLastOrder() {
+    lastOrder = null;
+    paintLast();
+    if (!selectedBranchId) return;
+    var req = ++lastReq, bid = selectedBranchId;
+    callGAS({ action: 'getLastOrder', branch_id: bid }).then(function(r) {
+      if (req !== lastReq || !r || !r.ok || !r.found) return;
+      var m = {};
+      r.items.forEach(function(it) { m[it.item_id] = it.qty; });
+      lastOrder = { branch_id: bid, items: m, date_disp: r.date_disp, by: r.by };
+      paintLast();
+    }).catch(function() {});
+  }
+  function paintLast() {
+    allItems.forEach(function(it) {
+      var s = el('last-' + it.item_id);
+      if (s) s.textContent = (lastOrder && lastOrder.items[it.item_id]) ? 'ครั้งก่อน ' + lastOrder.items[it.item_id] : '';
+    });
+    var b = el('repeatBtn');
+    if (lastOrder) {
+      b.textContent = '↺ สั่งเหมือนครั้งก่อน (' + (lastOrder.date_disp || '') + (lastOrder.by ? ' · ' + lastOrder.by : '') + ')';
+      b.style.display = 'block';
+    } else {
+      b.style.display = 'none';
+    }
+  }
+  window.repeatLast = function() {
+    if (!lastOrder) return;
+    allItems.forEach(function(it) {
+      var n = Math.min(QTY_MAX, Number(lastOrder.items[it.item_id]) || 0);
+      qty[it.item_id] = n;
+      var q = el('qty-' + it.item_id); if (q) q.value = n;
+      paintQty(it.item_id);
+    });
+  };
 
-    // guard: ต้องมีสาขาที่เลือก (ปกติมี default อยู่แล้ว)
+  // ── v22: สรุปก่อนส่ง ──────────────────────────────
+  function selectedList() { return allItems.filter(function(it){ return qty[it.item_id] > 0; }); }
+  el('submitBtn').addEventListener('click', function() {
+    var items = selectedList();
+    if (!items.length) return;
     if (!selectedBranchId) {
       showResult('fail', '❌', 'ยังไม่ได้เลือกสาขา', 'กรุณาเลือกสาขาที่จะสั่งให้', false);
       return;
     }
+    var bName = branchNames[String(selectedBranchId)] || '';
+    el('sumBranch').textContent = '→ ' + bName;
+    el('sumList').innerHTML = items.map(function(it) {
+      return '<div class="sum-row"><span>' + esc(it.item_name) + '</span><b>× ' + qty[it.item_id] + '</b></div>';
+    }).join('');
+    el('cText').textContent = '📨 ยืนยันส่ง ' + items.length + ' รายการ → ' + bName;
+    el('sumOverlay').style.display = 'flex';
+  });
+  el('sumBack').addEventListener('click', function() { el('sumOverlay').style.display = 'none'; });
+
+  // ── SUBMIT ───────────────────────────────────────
+  el('confirmBtn').addEventListener('click', function() {
+    var selectedItems = selectedList();
+    if (!selectedItems.length || !selectedBranchId) return;
 
     var orderItems = selectedItems.map(function(it) {
       return { item_id: it.item_id, item_name: it.item_name, qty: qty[it.item_id] };
@@ -605,6 +693,7 @@
     callGAS({ action: 'supplyOrder', branch_id: selectedBranchId, items: orderItems, note: note, deliver_choice: deliverChoice })
       .then(function(data) {
         setLoading(false);
+        el('sumOverlay').style.display = 'none';
         if (data.ok) {
           var deliverLabel = (deliverChoice === 'tomorrow') ? 'พรุ่งนี้' : 'วันนี้';
           showResult('success',
@@ -627,14 +716,16 @@
       })
       .catch(function() {
         setLoading(false);
+        el('sumOverlay').style.display = 'none';
         showResult('fail', '❌', 'เชื่อมต่อไม่ได้', 'กรุณาลองใหม่อีกครั้ง', false);
       });
   });
 
   function setLoading(on) {
-    el('submitBtn').disabled = on;
+    el('confirmBtn').disabled = on;
+    el('sumBack').disabled = on;
     el('spinner').style.display = on ? 'block' : 'none';
-    el('btnText').style.visibility = on ? 'hidden' : 'visible';
+    el('cText').style.visibility = on ? 'hidden' : 'visible';
   }
 
   function showResult(type, emoji, title, detail, isSuccess) {
@@ -663,6 +754,7 @@
     el('noteInput').value = '';
     setDeliver('today');
     el('resultOverlay').style.display = 'none';
+    loadLastOrder();   // v22: ออเดอร์ที่เพิ่งส่ง = "ครั้งก่อน" อันใหม่
     updateCartBadge();
     updateSubmitBtn();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -703,7 +795,8 @@
         // โหลดสาขา + รายการสินค้า พร้อมกัน (คู่ขนาน — ไม่ให้หน้าจอช้า)
         return Promise.all([
           callGAS({ action: 'getBranches' }),
-          callGAS({ action: 'getSupplyList' })
+          callGAS({ action: 'getSupplyList' }),
+          callGAS({ action: 'getTodayStatus' }).catch(function() { return null; })   // v22: สาขาวันนี้
         ]);
       };
 
@@ -740,18 +833,21 @@
       if (!results) return;
       var branchData = results[0];
       var listData   = results[1];
+      var ts         = results[2];
+      todayBranchId = (ts && ts.ok && ts.today_branch_id) ? Number(ts.today_branch_id) : null;
 
       // เติม dropdown สาขา (default = สาขาพนักงาน)
       if (branchData && branchData.ok && branchData.branches && branchData.branches.length) {
         // default = สาขาจากโปรไฟล์ → ถ้าไม่มี ใช้ที่หน้าแรกเก็บไว้ → ถ้าไม่มีอีก ปล่อยให้พนักงานเลือกเอง (ห้ามเดา)
         var sess  = getSessionEmp();
-        var defId = (emp && emp.branch_id) || (sess && sess.branch_id) || null;
+        var defId = todayBranchId || (emp && emp.branch_id) || (sess && sess.branch_id) || null;
         renderBranches(branchData.branches, defId);
       }
 
       // เติมรายการสินค้า
       if (listData && listData.ok && listData.items && listData.items.length) {
         renderItems(listData.items);
+        loadLastOrder();
       } else {
         el('loadingWrap').innerHTML =
           '<div style="text-align:center;color:#922B21;font-size:14px">' +
