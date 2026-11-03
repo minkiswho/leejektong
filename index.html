@@ -270,7 +270,6 @@
     .btn-pick     .btn-icon { background: #FFF4E5; }
     .btn-inspect  .btn-icon { background: #EAF0F8; }
     .btn-inspectview .btn-icon { background: #E7F5EC; }
-    .btn-revenue  .btn-icon { background: #EAF0F8; }
     .btn-sop      .btn-icon { background: #FFF4E5; }
     .action-btn .btn-label {
       font-size: 14px; font-weight: 700; line-height: 1.3;
@@ -565,11 +564,6 @@
       <div class="btn-label">ดูผลตรวจ</div>
       <div class="btn-sub">ประวัติ–สถานะเดือนนี้</div>
     </a>
-    <a class="action-btn btn-revenue" href="LJK_Dashboard_mockup.html" id="btnRevenue" style="display:none;">
-      <div class="btn-icon">🏬</div>
-      <div class="btn-label">รวมยอดห้าง</div>
-      <div class="btn-sub">ดูรายรับ–ยอดหักห้าง</div>
-    </a>
   </div>
 </div>
 
@@ -769,7 +763,7 @@
   }
 
   // ปุ่มที่โชว์ตามสิทธิ์ — ซ่อนก่อนทุกครั้ง แล้วค่อยเปิดตามโปรไฟล์ล่าสุด (กันปุ่มค้างตอนลดสิทธิ์)
-  var GATED_BTNS = ['btnApprove','btnApproveLeave','btnRevenue','btnPick','btnInspect','btnInspectView','btnApproveReg'];
+  var GATED_BTNS = ['btnApprove','btnApproveLeave','btnPick','btnInspect','btnInspectView','btnApproveReg'];
   function hideGatedButtons() {
     GATED_BTNS.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
   }
@@ -790,11 +784,10 @@
     sessionStorage.setItem('lj_role', emp.role);
 
     hideGatedButtons();
-    // โชว์ปุ่มอนุมัติ + รวมยอดห้าง เฉพาะ super_admin / manager
+    // โชว์ปุ่มอนุมัติ เฉพาะ super_admin / manager (รวมยอดห้าง ย้ายไประบบอื่นแล้ว — 3 พ.ย. 69)
     if (emp.role === 'super_admin' || emp.role === 'manager') {
       document.getElementById('btnApprove').style.display = 'flex';
       document.getElementById('btnApproveLeave').style.display = 'flex';
-      document.getElementById('btnRevenue').style.display = 'flex';
     }
     // โชว์ปุ่มจัดของ เฉพาะร้านหลัก (branch_id 15) หรือ super_admin
     if (Number(emp.branch_id) === 15 || emp.role === 'super_admin') {
