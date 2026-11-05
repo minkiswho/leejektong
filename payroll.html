@@ -142,6 +142,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
 .hidden{display:none}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);
   color:#fff;padding:12px 20px;border-radius:12px;font-size:13px;z-index:100;max-width:90%;text-align:center}
+
+/* v23: ปิดรายการค้าง */
+.close-link{display:block;width:100%;margin-top:10px;background:none;border:0;color:var(--sub);font-family:inherit;font-size:13px;text-decoration:underline;padding:6px;cursor:pointer}
+.mini-close{flex-shrink:0;margin-left:8px;background:#fff;border:1.5px solid var(--border);color:var(--sub);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;padding:4px 9px;cursor:pointer}
+.cl-ov{position:fixed;inset:0;background:rgba(31,39,51,.55);display:none;align-items:flex-start;justify-content:center;padding:14vh 18px 0;z-index:120}
+.cl-box{background:#fff;border-radius:18px;padding:20px 18px 12px;width:100%;max-width:380px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.cl-t{font-size:17px;font-weight:800;margin-bottom:4px}
+.cl-s{font-size:13px;color:var(--sub);margin-bottom:14px;line-height:1.5}
+.cl-box .btn{margin-top:8px}
+.cl-cancel{width:100%;background:none;border:0;color:var(--sub);font-family:inherit;font-size:15px;font-weight:600;padding:12px;cursor:pointer}
+/* v23: ช่องกรอก ≥16px — iPhone จะไม่ซูมเองตอนแตะ */
+input,select,textarea{font-size:16px !important}
 </style>
 </head>
 <body>
@@ -150,6 +162,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
   <a class="home-btn" href="index.html">‹ หน้าแรก</a>
   <h1>จ่ายเงินเดือน</h1>
   <p id="hdSub">หลีเจ็กตง</p>
+</div>
+
+<!-- v23: ปิดรายการค้าง (Mink) -->
+<div class="cl-ov" id="clOv">
+  <div class="cl-box">
+    <div class="cl-t" id="clT">ปิดรายการ</div>
+    <div class="cl-s" id="clS"></div>
+    <button class="btn success" id="clPaid">✅ โอนนอกระบบแล้ว</button>
+    <button class="btn ghost" id="clCancel">✖ ยกเลิก (ไม่ได้จ่าย)</button>
+    <button class="cl-cancel" id="clNo">ไม่ทำอะไร</button>
+  </div>
 </div>
 
 <div class="wrap">
@@ -712,7 +735,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
       h += '<div class="card"><div class="sect-lbl">รอพนักงานกรอกบัญชี</div>';
       for (var p=0;p<pending.length;p++){
         h += '<div class="line"><span class="k">'+esc(pending[p].name)+' · '+esc(pending[p].branch_name)+'</span>'
-          + '<span class="v" style="color:var(--warn)">'+fmt(pending[p].amount_net)+'</span></div>';
+          + '<span class="v" style="color:var(--warn);display:flex;align-items:center">'+fmt(pending[p].amount_net)
+          + (pending[p].payroll_id ? '<button class="mini-close" onclick="askClose(\''+esc(pending[p].payroll_id)+'\',\''+esc(pending[p].name)+'\','+Number(pending[p].amount_net||0)+',null)">ปิด</button>' : '')
+          + '</span></div>';
       }
       h += '</div>';
     }
@@ -738,6 +763,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
       h += '<div class="slip-box" onclick="document.getElementById(\'file_'+i+'\').click()" id="slipbox_'+i+'">📎 แตะเลือกรูปสลิป</div>';
       h += '<input type="file" accept="image/*" id="file_'+i+'" class="hidden" onchange="previewSlip('+i+',this)">';
       h += '<button class="btn success" id="paybtn_'+i+'" onclick="submitSlip('+i+',\''+esc(q.payroll_id)+'\')" disabled>ยืนยันจ่ายแล้ว →</button>';
+      h += '<button class="close-link" onclick="askClose(\''+esc(q.payroll_id)+'\',\''+esc(q.name)+'\','+Number(q.amount_net||0)+','+i+')">โอนนอกระบบไปแล้ว / ยกเลิกรายการนี้</button>';
       h += '</div>';
     }
     document.getElementById(target).innerHTML = h;
@@ -763,6 +789,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Sarabun',sans-seri
       legacy() ? ok() : fail();
     }
   }
+
+  // ─────────────────────────────────────────────
+  // v23 — ปิดรายการค้าง (โอนนอกระบบแล้ว / ยกเลิก) · ไม่ส่ง LINE · super_admin เท่านั้น (backend เช็คซ้ำ)
+  // ─────────────────────────────────────────────
+  window.askClose = function(pid, name, amount, idx){
+    var amt = amount;
+    if (idx !== null && idx !== undefined) {
+      var raw = String((document.getElementById('net_'+idx)||{}).value || '').trim();
+      if (raw !== '' && parseNum(raw) > 0) amt = parseNum(raw);
+    }
+    document.getElementById('clT').textContent = 'ปิดรายการของ ' + name;
+    document.getElementById('clS').textContent = 'ยอด ' + fmt(amt) + ' บาท · ไม่ต้องแนบสลิป · ไม่ส่ง LINE หาพนักงาน · ปิดแล้วแก้ในแอปไม่ได้';
+    document.getElementById('clOv').style.display = 'flex';
+    var bP = document.getElementById('clPaid'), bC = document.getElementById('clCancel');
+    function run(mode, btn, label){
+      bP.disabled = true; bC.disabled = true; btn.textContent = 'กำลังบันทึก...';
+      callGAS('closePayroll', { payroll_id: pid, mode: mode, amount: (mode === 'paid_outside' ? amt : undefined) }).then(function(res){
+        bP.disabled = false; bC.disabled = false; btn.textContent = label;
+        document.getElementById('clOv').style.display = 'none';
+        if (!res.ok && res.error !== 'ALREADY_CLOSED') { toast(res.message || res.error); return; }
+        toast(res.message || 'ปิดรายการแล้ว');
+        adminHome(true);
+      }).catch(function(e){
+        bP.disabled = false; bC.disabled = false; btn.textContent = label;
+        toast('บันทึกไม่สำเร็จ [' + errText(e) + '] — กดใหม่ได้');
+      });
+    }
+    bP.onclick = function(){ run('paid_outside', bP, '✅ โอนนอกระบบแล้ว'); };
+    bC.onclick = function(){ run('cancel', bC, '✖ ยกเลิก (ไม่ได้จ่าย)'); };
+    document.getElementById('clNo').onclick = function(){ document.getElementById('clOv').style.display = 'none'; };
+  };
 
   var slipData = {}; // idx -> { base64, mime }
 
